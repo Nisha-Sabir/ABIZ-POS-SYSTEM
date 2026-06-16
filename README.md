@@ -97,6 +97,27 @@ Open:
 - API docs: http://127.0.0.1:8000/docs
 - OpenAPI JSON: http://127.0.0.1:8000/openapi.json
 
+## Railway Deployment
+
+Railway uses `railway.json`.
+
+Required variables:
+
+```env
+DATABASE_URL=your_railway_postgres_url
+SECRET_KEY=your_strong_secret_key
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+ALGORITHM=HS256
+ENVIRONMENT=production
+DEBUG=false
+```
+
+Start command:
+
+```bash
+alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
 ## Authentication
 
 Available authentication routes:
