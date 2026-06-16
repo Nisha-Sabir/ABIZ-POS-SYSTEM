@@ -22,6 +22,18 @@ class Settings(BaseSettings):
     )
     access_token_expire_minutes: int = 60
     algorithm: str = "HS256"
+    backend_cors_origins: str = Field(
+        default="http://127.0.0.1:8000,http://localhost:8000",
+        description="Comma-separated frontend origins allowed to call the API.",
+    )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        return [
+            origin.strip()
+            for origin in self.backend_cors_origins.split(",")
+            if origin.strip()
+        ]
 
     model_config = SettingsConfigDict(
         env_file=".env",
