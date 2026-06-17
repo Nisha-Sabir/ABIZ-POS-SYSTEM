@@ -60,7 +60,29 @@ button {
   cursor: pointer;
 }
 
+button,
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.link-button {
+  border: 0;
+  background: #2563eb;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
 button.secondary {
+  background: #64748b;
+}
+
+.link-button.secondary {
   background: #64748b;
 }
 

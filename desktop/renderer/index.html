@@ -5,76 +5,83 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ABIZ POS Desktop</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    body { overflow: hidden; }
+    .desktop-header {
+      height: 52px;
+      background: #060c1a;
+      color: #e8f0fe;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      gap: 12px;
+      border-bottom: 1px solid #1e2d47;
+    }
+    .brand { font-weight: 800; letter-spacing: .2px; }
+    .desktop-actions { display: flex; gap: 8px; align-items: center; }
+    .desktop-actions input {
+      width: 360px;
+      margin: 0;
+      padding: 8px 10px;
+      font-size: 13px;
+      background: #111827;
+      color: #e8f0fe;
+      border-color: #1e2d47;
+    }
+    .desktop-actions button,
+    .desktop-actions a {
+      padding: 8px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    iframe {
+      width: 100vw;
+      height: calc(100vh - 52px);
+      border: 0;
+      display: block;
+      background: #0a0f1e;
+    }
+  </style>
 </head>
 <body>
-  <main class="shell">
-    <section class="topbar">
-      <div>
-        <h1>ABIZ POS Desktop</h1>
-        <p id="status">Offline-ready sales terminal</p>
-      </div>
-      <div class="actions">
-        <button id="login-btn">Login</button>
-        <button id="sync-products">Sync Products</button>
-        <button id="sync-sales">Sync Sales</button>
-        <button id="settings-btn">Settings</button>
-      </div>
-    </section>
+  <header class="desktop-header">
+    <div class="brand">ABIZ Global Services POS</div>
+    <div class="desktop-actions">
+      <input id="api-base" placeholder="https://your-railway-domain.up.railway.app/api/v1">
+      <button id="save-api">Save Backend</button>
+      <a class="link-button secondary" href="offline.html">Offline POS</a>
+    </div>
+  </header>
+  <iframe id="web-dashboard" src="../frontend/index.html"></iframe>
 
-    <section class="grid">
-      <div class="panel">
-        <h2>Scanner</h2>
-        <input id="scanner-input" autocomplete="off" placeholder="Scan QR/barcode with USB scanner">
-        <p class="hint">USB scanner works like keyboard input. Keep this field focused and scan.</p>
-        <div id="product-result" class="result"></div>
-      </div>
+  <script>
+    const input = document.getElementById('api-base');
+    const frame = document.getElementById('web-dashboard');
+    input.value = localStorage.getItem('abiz_api_base') || '';
 
-      <div class="panel">
-        <h2>Cart</h2>
-        <div id="cart-list" class="cart"></div>
-        <div class="totals">
-          <span>Total</span>
-          <strong id="total">0.00</strong>
-        </div>
-        <div class="row">
-          <button id="clear-cart" class="secondary">Clear</button>
-          <button id="checkout">Save Sale & Print</button>
-        </div>
-      </div>
-    </section>
+    function applyApiBase() {
+      const value = input.value.trim();
+      if (!value) return;
+      localStorage.setItem('abiz_api_base', value);
+      try {
+        frame.contentWindow.localStorage.setItem('abiz_api_base', value);
+        frame.contentWindow.location.reload();
+      } catch {
+        frame.src = frame.src;
+      }
+    }
 
-    <section class="panel">
-      <h2>Local Products</h2>
-      <div id="products-list" class="products"></div>
-    </section>
-  </main>
+    frame.addEventListener('load', () => {
+      const value = localStorage.getItem('abiz_api_base');
+      if (!value) return;
+      try {
+        frame.contentWindow.localStorage.setItem('abiz_api_base', value);
+      } catch {}
+    });
 
-  <dialog id="settings-dialog">
-    <form method="dialog">
-      <h2>Server Settings</h2>
-      <label>Backend URL</label>
-      <input id="backend-url" placeholder="https://your-app.up.railway.app/api/v1">
-      <div class="row">
-        <button value="cancel" class="secondary">Cancel</button>
-        <button id="save-settings" value="default">Save</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="login-dialog">
-    <form method="dialog">
-      <h2>Login</h2>
-      <label>Email</label>
-      <input id="login-email" type="email" placeholder="admin@example.com">
-      <label>Password</label>
-      <input id="login-password" type="password" placeholder="Password">
-      <div class="row">
-        <button value="cancel" class="secondary">Cancel</button>
-        <button id="do-login" value="default">Login</button>
-      </div>
-    </form>
-  </dialog>
-
-  <script src="renderer.js"></script>
+    document.getElementById('save-api').addEventListener('click', applyApiBase);
+  </script>
 </body>
 </html>
