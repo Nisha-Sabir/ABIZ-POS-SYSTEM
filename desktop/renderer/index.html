@@ -14,6 +14,7 @@
         <p id="status">Offline-ready sales terminal</p>
       </div>
       <div class="actions">
+        <button id="login-btn">Login</button>
         <button id="sync-products">Sync Products</button>
         <button id="sync-sales">Sync Sales</button>
         <button id="settings-btn">Settings</button>
@@ -53,11 +54,23 @@
       <h2>Server Settings</h2>
       <label>Backend URL</label>
       <input id="backend-url" placeholder="https://your-app.up.railway.app/api/v1">
-      <label>JWT Token</label>
-      <input id="auth-token" placeholder="Login token">
       <div class="row">
         <button value="cancel" class="secondary">Cancel</button>
         <button id="save-settings" value="default">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="login-dialog">
+    <form method="dialog">
+      <h2>Login</h2>
+      <label>Email</label>
+      <input id="login-email" type="email" placeholder="admin@example.com">
+      <label>Password</label>
+      <input id="login-password" type="password" placeholder="Password">
+      <div class="row">
+        <button value="cancel" class="secondary">Cancel</button>
+        <button id="do-login" value="default">Login</button>
       </div>
     </form>
   </dialog>

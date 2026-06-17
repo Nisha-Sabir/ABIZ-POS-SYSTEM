@@ -4,25 +4,92 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
-const store = {
-  get(key, fallback) {
-    try {
-      return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
-    } catch {
-      return fallback;
-    }
-  },
-  set(key, value) {
-    localStorage.setItem(key, JSON.stringify(value));
+
+const localDb = (() => {
+  const request = indexedDB.open('abiz-pos-local-db', 1);
+  const ready = new Promise((resolve, reject) => {
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains('settings')) db.createObjectStore('settings');
+      if (!db.objectStoreNames.contains('products')) db.createObjectStore('products', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('pending_sales')) db.createObjectStore('pending_sales', { keyPath: 'client_sale_id' });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+
+  async function store(name, mode = 'readonly') {
+    const db = await ready;
+    return db.transaction(name, mode).objectStore(name);
   }
-};
+
+  return {
+    async getSetting(key) {
+      const objectStore = await store('settings');
+      return new Promise((resolve) => {
+        const req = objectStore.get(key);
+        req.onsuccess = () => resolve(req.result || '');
+        req.onerror = () => resolve('');
+      });
+    },
+    async setSetting(key, value) {
+      const objectStore = await store('settings', 'readwrite');
+      return new Promise((resolve, reject) => {
+        const req = objectStore.put(value, key);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+      });
+    },
+    async putProducts(products) {
+      const objectStore = await store('products', 'readwrite');
+      return Promise.all(products.map((product) => new Promise((resolve, reject) => {
+        const req = objectStore.put(product);
+        req.onsuccess = resolve;
+        req.onerror = () => reject(req.error);
+      })));
+    },
+    async listProducts() {
+      const objectStore = await store('products');
+      return new Promise((resolve) => {
+        const req = objectStore.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+    },
+    async addPendingSale(sale) {
+      const objectStore = await store('pending_sales', 'readwrite');
+      return new Promise((resolve, reject) => {
+        const req = objectStore.put(sale);
+        req.onsuccess = () => resolve(true);
+        req.onerror = () => reject(req.error);
+      });
+    },
+    async listPendingSales() {
+      const objectStore = await store('pending_sales');
+      return new Promise((resolve) => {
+        const req = objectStore.getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+    },
+    async removePendingSales(ids) {
+      const objectStore = await store('pending_sales', 'readwrite');
+      return Promise.all(ids.map((id) => new Promise((resolve, reject) => {
+        const req = objectStore.delete(id);
+        req.onsuccess = resolve;
+        req.onerror = () => reject(req.error);
+      })));
+    }
+  };
+})();
 
 function money(value) {
   return Number(value || 0).toFixed(2);
 }
 
-function setStatus(message, ok = true) {
-  $('status').textContent = message;
+async function setStatus(message, ok = true) {
+  const pending = await localDb.listPendingSales();
+  $('status').textContent = `${navigator.onLine ? 'Online' : 'Offline'} | Pending: ${pending.length} | ${message}`;
   $('status').className = ok ? 'ok' : 'bad';
 }
 
@@ -52,32 +119,27 @@ function renderProducts() {
         <b>Stock: ${product.stock_quantity}</b>
       </div>
     `).join('')
-    : '<p class="empty">No local products. Click Sync Products when internet is available.</p>';
+    : '<p class="empty">No local products. Login and click Sync Products when internet is available.</p>';
 }
 
 async function refreshProducts() {
-  state.products = store.get('products', []);
+  state.products = await localDb.listProducts();
   renderProducts();
 }
 
 async function getBackendConfig() {
   return {
-    baseUrl: localStorage.getItem('backend_url') || '',
-    token: localStorage.getItem('auth_token') || ''
+    baseUrl: await localDb.getSetting('backend_url'),
+    token: await localDb.getSetting('auth_token')
   };
 }
 
 async function api(path, options = {}) {
   const { baseUrl, token } = await getBackendConfig();
-  if (!baseUrl || !token) throw new Error('Backend URL/token missing in settings.');
-  const response = await fetch(baseUrl.replace(/\/$/, '') + path, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-      ...(options.headers || {})
-    }
-  });
+  if (!baseUrl) throw new Error('Backend URL missing in Settings.');
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(baseUrl.replace(/\/$/, '') + path, { ...options, headers });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.detail || 'Server request failed.');
@@ -85,11 +147,24 @@ async function api(path, options = {}) {
   return response.status === 204 ? null : response.json();
 }
 
+async function login() {
+  const email = $('login-email').value.trim();
+  const password = $('login-password').value;
+  if (!email || !password) throw new Error('Email and password required.');
+  const token = await api('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ email, password })
+  });
+  await localDb.setSetting('auth_token', token.access_token);
+  await syncProducts();
+  await setStatus('Logged in and products synced.');
+}
+
 async function scanProduct(code) {
   const product = state.products.find((item) => item.qr_code === code);
   if (!product) {
     $('product-result').textContent = 'Product not found in local database.';
-    setStatus('Product not found. Sync products or add item online first.', false);
+    await setStatus('Product not found. Sync products first.', false);
     return;
   }
   const existing = state.cart.find((item) => item.id === product.id);
@@ -97,20 +172,20 @@ async function scanProduct(code) {
   else state.cart.push({ ...product, quantity: 1 });
   $('product-result').textContent = `${product.name} added. Price: ${money(product.sale_price)}`;
   renderCart();
-  setStatus('Item added from USB scanner.');
+  await setStatus('Item added from USB scanner.');
 }
 
 async function syncProducts() {
   const products = await api('/products?limit=100');
-  store.set('products', products);
+  await localDb.putProducts(products);
   await refreshProducts();
-  setStatus('Products synced for offline use.');
+  await setStatus('Products synced for offline use.');
 }
 
 async function syncSales() {
-  const pending = store.get('pending_sales', []);
+  const pending = await localDb.listPendingSales();
   if (!pending.length) {
-    setStatus('No pending offline sales.');
+    await setStatus('No pending offline sales.');
     return;
   }
   const response = await api('/sales/sync/offline', {
@@ -120,8 +195,20 @@ async function syncSales() {
   const syncedIds = response.results
     .filter((item) => item.status === 'synced' || item.status === 'already_synced')
     .map((item) => item.client_sale_id);
-  store.set('pending_sales', pending.filter((sale) => !syncedIds.includes(sale.client_sale_id)));
-  setStatus(`${syncedIds.length} offline sales synced.`);
+  await localDb.removePendingSales(syncedIds);
+  await setStatus(`${syncedIds.length} offline sales synced.`);
+}
+
+async function tryAutoSync() {
+  if (!navigator.onLine) {
+    await setStatus('Waiting for internet.');
+    return;
+  }
+  try {
+    await syncSales();
+  } catch {
+    await setStatus('Auto sync will retry.', false);
+  }
 }
 
 function printInvoice(sale) {
@@ -149,7 +236,7 @@ function printInvoice(sale) {
 
 async function checkout() {
   if (!state.cart.length) {
-    setStatus('Cart is empty.', false);
+    await setStatus('Cart is empty.', false);
     return;
   }
   const sale = {
@@ -161,18 +248,16 @@ async function checkout() {
       unit_price: item.sale_price
     }))
   };
-  const pending = store.get('pending_sales', []);
-  pending.push(sale);
-  store.set('pending_sales', pending);
+  await localDb.addPendingSale(sale);
   printInvoice(sale);
   state.cart = [];
   renderCart();
-  setStatus('Sale saved locally. It will sync when internet is available.');
+  await setStatus('Sale saved locally. Auto sync will run when internet is available.');
+  await tryAutoSync();
 }
 
 async function loadSettings() {
-  $('backend-url').value = localStorage.getItem('backend_url') || '';
-  $('auth-token').value = localStorage.getItem('auth_token') || '';
+  $('backend-url').value = await localDb.getSetting('backend_url');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -188,11 +273,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('checkout').addEventListener('click', () => checkout().catch((error) => setStatus(error.message, false)));
   $('clear-cart').addEventListener('click', () => { state.cart = []; renderCart(); });
   $('settings-btn').addEventListener('click', async () => { await loadSettings(); $('settings-dialog').showModal(); });
+  $('login-btn').addEventListener('click', () => $('login-dialog').showModal());
   $('save-settings').addEventListener('click', async () => {
-    localStorage.setItem('backend_url', $('backend-url').value.trim());
-    localStorage.setItem('auth_token', $('auth-token').value.trim());
-    setStatus('Settings saved.');
+    await localDb.setSetting('backend_url', $('backend-url').value.trim());
+    await setStatus('Settings saved.');
   });
+  $('do-login').addEventListener('click', () => login().catch((error) => setStatus(error.message, false)));
+  window.addEventListener('online', tryAutoSync);
+  window.addEventListener('offline', () => setStatus('Offline mode active.'));
+  setInterval(tryAutoSync, 60000);
   await refreshProducts();
   renderCart();
+  await setStatus('Desktop app ready.');
 });

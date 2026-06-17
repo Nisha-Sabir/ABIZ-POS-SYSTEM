@@ -125,7 +125,7 @@ The `desktop/` folder contains an Electron-based offline POS foundation.
 
 - Railway hosts the central backend and owner web dashboard.
 - The desktop app runs on the shopkeeper's Windows PC.
-- Local desktop storage saves offline sales.
+- IndexedDB local database saves offline sales on the client computer.
 - USB QR/barcode scanners work as keyboard input in the scanner field.
 - Pending offline sales sync to `POST /api/v1/sales/sync/offline` when internet is available.
 
