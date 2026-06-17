@@ -125,7 +125,7 @@ The `desktop/` folder contains an Electron-based offline POS foundation.
 
 - Railway hosts the central backend and owner web dashboard.
 - The desktop app runs on the shopkeeper's Windows PC.
-- Local SQLite stores offline sales.
+- Local desktop storage saves offline sales.
 - USB QR/barcode scanners work as keyboard input in the scanner field.
 - Pending offline sales sync to `POST /api/v1/sales/sync/offline` when internet is available.
 
@@ -142,6 +142,14 @@ Build Windows installer:
 ```bash
 npm run build
 ```
+
+Portable desktop package created locally:
+
+```text
+desktop/release/ABIZ-POS-Desktop.zip
+```
+
+Extract the ZIP and run `ABIZ POS.exe`.
 
 See `DESKTOP_OFFLINE_PLAN.md` for the offline workflow and remaining production steps.
 

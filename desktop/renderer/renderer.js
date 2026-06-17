@@ -4,6 +4,18 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+const store = {
+  get(key, fallback) {
+    try {
+      return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback));
+    } catch {
+      return fallback;
+    }
+  },
+  set(key, value) {
+    localStorage.setItem(key, JSON.stringify(value));
+  }
+};
 
 function money(value) {
   return Number(value || 0).toFixed(2);
@@ -44,14 +56,14 @@ function renderProducts() {
 }
 
 async function refreshProducts() {
-  state.products = await window.abiz.listProducts();
+  state.products = store.get('products', []);
   renderProducts();
 }
 
 async function getBackendConfig() {
   return {
-    baseUrl: await window.abiz.getSetting('backend_url'),
-    token: await window.abiz.getSetting('auth_token')
+    baseUrl: localStorage.getItem('backend_url') || '',
+    token: localStorage.getItem('auth_token') || ''
   };
 }
 
@@ -74,7 +86,7 @@ async function api(path, options = {}) {
 }
 
 async function scanProduct(code) {
-  const product = await window.abiz.findProductByCode(code);
+  const product = state.products.find((item) => item.qr_code === code);
   if (!product) {
     $('product-result').textContent = 'Product not found in local database.';
     setStatus('Product not found. Sync products or add item online first.', false);
@@ -90,13 +102,13 @@ async function scanProduct(code) {
 
 async function syncProducts() {
   const products = await api('/products?limit=100');
-  await window.abiz.upsertProducts(products);
+  store.set('products', products);
   await refreshProducts();
   setStatus('Products synced for offline use.');
 }
 
 async function syncSales() {
-  const pending = await window.abiz.getPendingSales();
+  const pending = store.get('pending_sales', []);
   if (!pending.length) {
     setStatus('No pending offline sales.');
     return;
@@ -108,7 +120,7 @@ async function syncSales() {
   const syncedIds = response.results
     .filter((item) => item.status === 'synced' || item.status === 'already_synced')
     .map((item) => item.client_sale_id);
-  await window.abiz.markSalesSynced(syncedIds);
+  store.set('pending_sales', pending.filter((sale) => !syncedIds.includes(sale.client_sale_id)));
   setStatus(`${syncedIds.length} offline sales synced.`);
 }
 
@@ -149,7 +161,9 @@ async function checkout() {
       unit_price: item.sale_price
     }))
   };
-  await window.abiz.saveOfflineSale(sale);
+  const pending = store.get('pending_sales', []);
+  pending.push(sale);
+  store.set('pending_sales', pending);
   printInvoice(sale);
   state.cart = [];
   renderCart();
@@ -157,8 +171,8 @@ async function checkout() {
 }
 
 async function loadSettings() {
-  $('backend-url').value = await window.abiz.getSetting('backend_url');
-  $('auth-token').value = await window.abiz.getSetting('auth_token');
+  $('backend-url').value = localStorage.getItem('backend_url') || '';
+  $('auth-token').value = localStorage.getItem('auth_token') || '';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -175,8 +189,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('clear-cart').addEventListener('click', () => { state.cart = []; renderCart(); });
   $('settings-btn').addEventListener('click', async () => { await loadSettings(); $('settings-dialog').showModal(); });
   $('save-settings').addEventListener('click', async () => {
-    await window.abiz.setSetting('backend_url', $('backend-url').value.trim());
-    await window.abiz.setSetting('auth_token', $('auth-token').value.trim());
+    localStorage.setItem('backend_url', $('backend-url').value.trim());
+    localStorage.setItem('auth_token', $('auth-token').value.trim());
     setStatus('Settings saved.');
   });
   await refreshProducts();

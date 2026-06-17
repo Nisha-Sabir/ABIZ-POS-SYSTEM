@@ -5,14 +5,14 @@ This project now has a desktop/offline foundation in the `desktop/` folder.
 ## What Runs Where
 
 - Railway: central FastAPI backend, PostgreSQL database, owner web dashboard, reports.
-- Client Windows PC: Electron desktop POS app with local SQLite storage.
+- Client Windows PC: Electron desktop POS app with local browser storage for offline sales.
 
 ## Offline Flow
 
 1. Shopkeeper opens desktop app.
 2. Products are synced from the online backend when internet is available.
 3. USB QR/barcode scanner enters the product code into the scanner input.
-4. Sale is saved locally in SQLite, even without internet.
+4. Sale is saved locally on the computer, even without internet.
 5. Invoice can be printed immediately.
 6. When internet returns, pending sales sync to the Railway backend.
 7. Backend updates sales records, product stock, and Digi Khata reports.
@@ -29,6 +29,18 @@ Build Windows installer:
 
 ```bash
 npm run build
+```
+
+If installer build is blocked by network access, create/use the portable package:
+
+```text
+desktop/release/ABIZ-POS-Desktop.zip
+```
+
+Client extracts the ZIP and runs:
+
+```text
+ABIZ POS.exe
 ```
 
 ## Desktop Settings
@@ -72,6 +84,7 @@ Payload:
 
 - Desktop login screen instead of manually pasting JWT token.
 - Product/category/inventory full offline editing.
+- SQLite upgrade for stronger local database storage.
 - Conflict handling when server stock changed while desktop was offline.
 - Automatic background sync interval.
 - Signed Windows installer.
