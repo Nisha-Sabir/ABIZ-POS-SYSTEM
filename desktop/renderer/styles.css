@@ -1,0 +1,166 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f4f7fb;
+  color: #182033;
+}
+
+.shell {
+  padding: 22px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 24px;
+}
+
+h2 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.ok {
+  color: #087f5b;
+}
+
+.bad {
+  color: #c92a2a;
+}
+
+.actions,
+.row {
+  display: flex;
+  gap: 10px;
+}
+
+button {
+  border: 0;
+  background: #2563eb;
+  color: white;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: #64748b;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.panel {
+  background: white;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.hint,
+.empty,
+small {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.result {
+  min-height: 34px;
+  padding-top: 8px;
+  font-weight: 700;
+}
+
+.cart,
+.products {
+  display: grid;
+  gap: 8px;
+}
+
+.cart-row,
+.product,
+.totals {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.cart-row div:first-child,
+.product {
+  min-width: 0;
+}
+
+.cart-row strong,
+.product strong,
+.cart-row small,
+.product span {
+  display: block;
+}
+
+.totals {
+  margin: 12px 0;
+  font-size: 18px;
+}
+
+dialog {
+  border: 0;
+  border-radius: 8px;
+  padding: 18px;
+  width: min(520px, 92vw);
+}
+
+label {
+  display: block;
+  font-weight: 700;
+  margin: 12px 0 6px;
+}
+
+@media (max-width: 860px) {
+  .topbar,
+  .grid {
+    display: block;
+  }
+
+  .actions {
+    margin-top: 14px;
+    flex-wrap: wrap;
+  }
+
+  .panel {
+    margin-bottom: 14px;
+  }
+}

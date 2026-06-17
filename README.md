@@ -4,7 +4,7 @@ Professional FastAPI backend for the ABIZ Global Services POS System.
 
 ## Current Scope
 
-Current scope includes project setup, PostgreSQL configuration, Alembic migration wiring, SQLAlchemy models, JWT authentication, product/category management, inventory management, QR code workflow, sales checkout, Digi Khata, license keys, and a connected frontend.
+Current scope includes project setup, PostgreSQL configuration, Alembic migration wiring, SQLAlchemy models, JWT authentication, product/category management, inventory management, QR code workflow, sales checkout, Digi Khata, license keys, a connected frontend, and a desktop/offline foundation.
 
 Advanced reports and Android APK packaging are not included yet.
 
@@ -36,6 +36,7 @@ requirements.txt
 .env.example
 docker-compose.yml
 frontend/
+desktop/
 README.md
 ```
 
@@ -117,6 +118,32 @@ Start command:
 ```bash
 alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
 ```
+
+## Desktop Offline Client
+
+The `desktop/` folder contains an Electron-based offline POS foundation.
+
+- Railway hosts the central backend and owner web dashboard.
+- The desktop app runs on the shopkeeper's Windows PC.
+- Local SQLite stores offline sales.
+- USB QR/barcode scanners work as keyboard input in the scanner field.
+- Pending offline sales sync to `POST /api/v1/sales/sync/offline` when internet is available.
+
+Run desktop app:
+
+```bash
+cd desktop
+npm install
+npm start
+```
+
+Build Windows installer:
+
+```bash
+npm run build
+```
+
+See `DESKTOP_OFFLINE_PLAN.md` for the offline workflow and remaining production steps.
 
 ## Authentication
 

@@ -1,0 +1,33 @@
+{
+  "name": "abiz-pos-desktop",
+  "version": "0.1.0",
+  "description": "ABIZ Global Services POS desktop offline client.",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "electron": "^33.2.1"
+  },
+  "devDependencies": {
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.abizglobalservices.pos",
+    "productName": "ABIZ POS",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

@@ -7,7 +7,7 @@ from app.api.dependencies import get_current_user
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.cart import CartItemRequest, CartResponse, ProductScanResponse
-from app.schemas.sale import CheckoutResponse, SaleResponse
+from app.schemas.sale import CheckoutResponse, OfflineSyncRequest, OfflineSyncResponse, SaleResponse
 from app.services.cart_service import (
     add_product_to_cart,
     build_cart_response,
@@ -16,7 +16,7 @@ from app.services.cart_service import (
     remove_product_from_cart,
 )
 from app.services.product_service import get_product_by_qr_code
-from app.services.sale_service import checkout_cart, get_sale_by_id, get_sales
+from app.services.sale_service import checkout_cart, get_sale_by_id, get_sales, sync_offline_sales
 
 router = APIRouter(prefix="/sales", tags=["Sales Foundation"])
 
@@ -108,6 +108,15 @@ def checkout_current_cart(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     return CheckoutResponse(sale=sale)
+
+
+@router.post("/sync/offline", response_model=OfflineSyncResponse)
+def sync_offline_sale_batch(
+    sync_data: OfflineSyncRequest,
+    db: Annotated[Session, Depends(get_db)],
+    _: Annotated[User, Depends(get_current_user)],
+) -> OfflineSyncResponse:
+    return OfflineSyncResponse(results=sync_offline_sales(db, sync_data.sales))
 
 
 @router.get("", response_model=list[SaleResponse])
