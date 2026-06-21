@@ -149,8 +149,11 @@ async function refreshProducts() {
 }
 
 async function getBackendConfig() {
+  const savedUrl = await localDb.getSetting('backend_url');
+  const sharedUrl = localStorage.getItem('abiz_api_base') || '';
+  if (!savedUrl && sharedUrl) await localDb.setSetting('backend_url', sharedUrl);
   return {
-    baseUrl: await localDb.getSetting('backend_url'),
+    baseUrl: savedUrl || sharedUrl,
     token: await localDb.getSetting('auth_token')
   };
 }
@@ -169,8 +172,13 @@ async function api(path, options = {}) {
 }
 
 async function login() {
+  const backendUrl = $('backend-url').value.trim();
   const email = $('login-email').value.trim();
   const password = $('login-password').value;
+  if (backendUrl) {
+    await localDb.setSetting('backend_url', backendUrl);
+    localStorage.setItem('abiz_api_base', backendUrl);
+  }
   if (!email || !password) throw new Error('Email and password required.');
   const token = await api('/auth/login', {
     method: 'POST',
@@ -178,6 +186,7 @@ async function login() {
   });
   await localDb.setSetting('auth_token', token.access_token);
   await localDb.setSetting('login_email', email);
+  await localDb.setSetting('login_password', password);
   await localDb.setSetting('last_login_at', new Date().toISOString());
   await syncProducts();
   await updateAuthState();
@@ -298,12 +307,13 @@ async function checkout() {
 }
 
 async function loadSettings() {
-  $('backend-url').value = await localDb.getSetting('backend_url');
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  $('backend-url').value = await localDb.getSetting('backend_url');
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
   $('login-email').value = await localDb.getSetting('login_email');
+  $('login-password').value = await localDb.getSetting('login_password');
   $('scanner-input').addEventListener('keydown', async (event) => {
     if (event.key !== 'Enter') return;
     const code = event.target.value.trim();
@@ -326,6 +336,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('login-btn').addEventListener('click', async () => {
     $('login-email').value = await localDb.getSetting('login_email');
+    $('login-password').value = await localDb.getSetting('login_password');
     $('login-password').focus();
   });
   $('save-settings')?.addEventListener('click', async () => {
@@ -342,6 +353,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   setInterval(tryAutoSync, 60000);
   await refreshProducts();
   renderCart();
-  await updateAuthState();
+  const loggedIn = await updateAuthState();
+  if (!loggedIn && navigator.onLine && $('backend-url').value && $('login-email').value && $('login-password').value) {
+    login().catch(() => setStatus('Saved login found. Click Login & Sync to refresh access.', false));
+  }
   await setStatus('Desktop app ready.');
 });
