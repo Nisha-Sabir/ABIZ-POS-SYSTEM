@@ -107,7 +107,11 @@ function renderCart() {
     : '<p class="empty">No items added.</p>';
 
   const total = state.cart.reduce((sum, item) => sum + item.sale_price * item.quantity, 0);
-  $('total').textContent = money(total);
+  const discount = Number($('discount-input')?.value || 0);
+  const payable = Math.max(0, total - discount);
+  const paid = Number($('amount-paid')?.value || 0);
+  $('total').textContent = money(payable);
+  if ($('change-amount')) $('change-amount').textContent = money(Math.max(0, paid - payable));
 }
 
 function renderProducts() {
@@ -156,6 +160,7 @@ async function login() {
     body: JSON.stringify({ email, password })
   });
   await localDb.setSetting('auth_token', token.access_token);
+  await localDb.setSetting('login_email', email);
   await syncProducts();
   await setStatus('Logged in and products synced.');
 }
@@ -242,6 +247,9 @@ async function checkout() {
   const sale = {
     client_sale_id: `DESK-${Date.now()}`,
     created_at: new Date().toISOString(),
+    payment_method: $('payment-method')?.value || 'cash',
+    discount: Number($('discount-input')?.value || 0),
+    amount_paid: Number($('amount-paid')?.value || 0),
     items: state.cart.map((item) => ({
       product_id: item.id,
       quantity: item.quantity,
@@ -272,8 +280,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('sync-sales').addEventListener('click', () => syncSales().catch((error) => setStatus(error.message, false)));
   $('checkout').addEventListener('click', () => checkout().catch((error) => setStatus(error.message, false)));
   $('clear-cart').addEventListener('click', () => { state.cart = []; renderCart(); });
+  $('discount-input')?.addEventListener('input', renderCart);
+  $('amount-paid')?.addEventListener('input', renderCart);
   $('settings-btn').addEventListener('click', async () => { await loadSettings(); $('settings-dialog').showModal(); });
-  $('login-btn').addEventListener('click', () => $('login-dialog').showModal());
+  $('login-btn').addEventListener('click', async () => {
+    $('login-email').value = await localDb.getSetting('login_email');
+    $('login-dialog').showModal();
+  });
   $('save-settings').addEventListener('click', async () => {
     await localDb.setSetting('backend_url', $('backend-url').value.trim());
     await setStatus('Settings saved.');

@@ -37,6 +37,27 @@
           <span>Total</span>
           <strong id="total">0.00</strong>
         </div>
+        <div class="form-group">
+          <label class="form-label">Discount</label>
+          <input id="discount-input" type="number" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Payment Method</label>
+          <select id="payment-method" class="form-control">
+            <option value="cash">Cash</option>
+            <option value="card">Card</option>
+            <option value="easypaisa">EasyPaisa</option>
+            <option value="jazzcash">JazzCash</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Amount Paid</label>
+          <input id="amount-paid" type="number" min="0" value="0">
+        </div>
+        <div class="totals">
+          <span>Change</span>
+          <strong id="change-amount">0.00</strong>
+        </div>
         <div class="row">
           <button id="clear-cart" class="secondary">Clear</button>
           <button id="checkout">Save Sale & Print</button>

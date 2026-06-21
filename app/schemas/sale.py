@@ -40,6 +40,9 @@ class OfflineSaleItemCreate(BaseModel):
 class OfflineSaleCreate(BaseModel):
     client_sale_id: str
     created_at: datetime
+    discount: Decimal = Decimal("0.00")
+    payment_method: str = "cash"
+    amount_paid: Decimal | None = None
     items: list[OfflineSaleItemCreate]
 
 

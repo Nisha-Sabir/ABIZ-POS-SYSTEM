@@ -135,7 +135,7 @@ textarea.form-control{resize:vertical}
 .pos-search{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .pos-search .form-control{flex:1;min-width:120px}
 .products-grid{flex:1;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
-.prod-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r2);padding:10px;cursor:pointer;transition:.2s;text-align:center}
+.prod-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 10px;cursor:pointer;transition:.2s;text-align:center;min-height:128px;display:flex;flex-direction:column;align-items:center;justify-content:center}
 .prod-card:hover{border-color:var(--blue);transform:translateY(-2px);box-shadow:var(--shadow)}
 .prod-card.out{opacity:.45;cursor:not-allowed}
 .prod-icon{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(0,212,255,.1));display:flex;align-items:center;justify-content:center;margin:0 auto 6px;font-size:18px}
@@ -168,6 +168,24 @@ textarea.form-control{resize:vertical}
 .checkout-btn:disabled{opacity:.35;cursor:not-allowed}
 .discount-row{display:flex;gap:6px;margin-bottom:8px}
 .discount-row input{flex:1;background:var(--card2);border:1px solid var(--border);border-radius:var(--r2);padding:6px 10px;font-size:11px;color:var(--text);outline:none;font-family:inherit}
+
+[data-theme="light"] .card,
+[data-theme="light"] .stat-card,
+[data-theme="light"] .cart-panel,
+[data-theme="light"] .prod-card,
+[data-theme="light"] .table-wrap,
+[data-theme="light"] .modal,
+[data-theme="light"] .form-control {
+  box-shadow: 0 1px 2px rgba(15,23,42,.06);
+}
+[data-theme="light"] .form-control,
+[data-theme="light"] .topbar-search input {
+  background:#fff;
+  color:#0f172a;
+}
+[data-theme="light"] .badge-blue { background:rgba(37,99,235,.14); color:#1D4ED8; }
+[data-theme="light"] .badge-green { background:rgba(16,185,129,.14); color:#047857; }
+[data-theme="light"] .badge-amber { background:rgba(245,158,11,.18); color:#92400E; }
 
 /* CHARTS */
 .chart-grid{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:20px}
@@ -634,11 +652,12 @@ textarea.form-control{resize:vertical}
         <div class="report-filters">
           <input type="date" class="form-control" style="width:140px" id="sales-date-from"/>
           <input type="date" class="form-control" style="width:140px" id="sales-date-to"/>
+          <input class="form-control" style="width:200px" id="sales-search" placeholder="Search invoice/payment..." oninput="renderSalesTable()"/>
           <select class="form-control" style="width:130px" id="sales-payment-filter" onchange="renderSalesTable()">
             <option value="">All Payments</option><option>cash</option><option>card</option><option>easypaisa</option><option>jazzcash</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="renderSalesTable()">Filter</button>
-          <button class="btn btn-outline btn-sm" onclick="showToast('Exporting CSV...','info')">Export</button>
+          <button class="btn btn-outline btn-sm" onclick="exportSalesCsv()">Export CSV</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -681,11 +700,11 @@ textarea.form-control{resize:vertical}
       <!-- REPORTS -->
       <div class="page" id="page-reports">
         <div class="report-filters">
-          <select class="form-control" style="width:150px"><option>Sales Report</option><option>Inventory Report</option><option>Profit Report</option></select>
-          <input type="date" class="form-control" style="width:140px"/>
-          <input type="date" class="form-control" style="width:140px"/>
-          <button class="btn btn-primary btn-sm">Generate</button>
-          <button class="btn btn-outline btn-sm" onclick="showToast('PDF exported!','success')">Export PDF</button>
+          <select class="form-control" style="width:150px" id="report-type"><option>Sales Report</option><option>Inventory Report</option><option>Profit Report</option></select>
+          <input type="date" class="form-control" style="width:140px" id="report-date-from"/>
+          <input type="date" class="form-control" style="width:140px" id="report-date-to"/>
+          <button class="btn btn-primary btn-sm" onclick="renderReports()">Generate</button>
+          <button class="btn btn-outline btn-sm" onclick="exportReportCsv()">Export CSV</button>
         </div>
         <div class="chart-grid mb-6">
           <div class="card"><div class="section-title">Monthly Sales Trend</div><div class="chart-wrap"><canvas id="monthlyChart"></canvas></div></div>
@@ -1017,6 +1036,7 @@ textarea.form-control{resize:vertical}
     </div>
     <div class="modal-body"><div id="receipt-content"></div></div>
     <div class="modal-footer">
+      <button class="btn btn-outline" onclick="editReceiptSettings()">Customize</button>
       <button class="btn btn-outline" onclick="closeModal('modal-receipt')">Close</button>
       <button class="btn btn-primary" onclick="window.print()">Print Receipt</button>
     </div>
@@ -2493,6 +2513,245 @@ async function startCameraScanner() {
 
 function stopCameraScanner() {
   document.getElementById('manual-scan-input')?.blur();
+}
+
+function parseSaleDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date() : date;
+}
+
+function dateKey(value) {
+  return parseSaleDate(value).toISOString().slice(0, 10);
+}
+
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map(row => row.map(cell => `"${String(cell ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function filteredSales() {
+  const from = document.getElementById('sales-date-from')?.value || '';
+  const to = document.getElementById('sales-date-to')?.value || '';
+  const payment = (document.getElementById('sales-payment-filter')?.value || '').toLowerCase();
+  const search = (document.getElementById('sales-search')?.value || '').toLowerCase();
+  return DB.sales.filter(s => {
+    const key = dateKey(s.rawDate || s.date);
+    const inFrom = !from || key >= from;
+    const inTo = !to || key <= to;
+    const inPay = !payment || String(s.payment || '').toLowerCase() === payment;
+    const inSearch = !search || [s.invoice, s.payment, s.status].some(v => String(v || '').toLowerCase().includes(search));
+    return inFrom && inTo && inPay && inSearch;
+  });
+}
+
+function updateStatCards(){
+  const today = todayKey();
+  const todaySales = DB.sales.filter(s => dateKey(s.rawDate || s.date) === today);
+  const todayRevenue = todaySales.reduce((a,s)=>a + Number(s.total || 0),0);
+  const todayProfit = todaySales.reduce((a,s)=>a + Number(s.profit || 0),0);
+  document.getElementById('s-products').textContent = DB.products.length;
+  document.getElementById('s-sales').textContent = todaySales.length;
+  document.getElementById('s-revenue').textContent = 'Rs.' + todayRevenue.toLocaleString();
+  document.getElementById('s-monthly').textContent = 'Rs.' + todayProfit.toLocaleString();
+  const low = DB.products.filter(p=>Number(p.stock || 0) <= Number(p.minStock || 10)).length;
+  document.getElementById('s-alerts').textContent = low;
+  const badge=document.getElementById('inv-badge');
+  if(badge) badge.textContent=low;
+}
+
+function renderRecentTxns(){
+  const el=document.getElementById('recent-txns'); if(!el) return;
+  const sales = [...DB.sales].sort((a,b)=>parseSaleDate(b.rawDate || b.date)-parseSaleDate(a.rawDate || a.date)).slice(0,5);
+  el.innerHTML = sales.length ? sales.map(s=>`
+    <div class="flex-between" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewSaleDetail('${s.id}')">
+      <div>
+        <div style="font-size:11px;font-weight:600">${s.invoice}</div>
+        <div style="font-size:10px;color:var(--text3)">${s.date}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:12px;font-weight:700;color:var(--green);font-family:'JetBrains Mono',monospace">Rs.${Number(s.total || 0).toLocaleString()}</div>
+        <span class="badge badge-blue">${s.payment || 'cash'}</span>
+      </div>
+    </div>`).join('') : '<div class="empty" style="padding:12px">No recent transactions</div>';
+}
+
+function renderDashboard(){
+  updateStatCards();
+  renderTopProducts();
+  renderRecentTxns();
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const tc=isDark?'#94A3B8':'#475569';
+  const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
+  const last7 = Array.from({length:7}, (_,i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return d.toISOString().slice(0,10);
+  });
+  const salesData = last7.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date) === k).reduce((a,s)=>a + Number(s.total || 0),0));
+  const profitData = last7.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date) === k).reduce((a,s)=>a + Number(s.profit || 0),0));
+  const ctx=document.getElementById('salesChart');
+  if(ctx){
+    if(salesChartInst)salesChartInst.destroy();
+    salesChartInst=new Chart(ctx,{type:'bar',data:{labels:last7.map(k=>k.slice(5)),datasets:[{label:'Sales',data:salesData,backgroundColor:'rgba(37,99,235,0.7)',borderRadius:5},{label:'Profit',data:profitData,backgroundColor:'rgba(16,185,129,0.7)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+  }
+}
+
+async function renderSalesTable() {
+  const tbody = document.getElementById('sales-tbody');
+  if (!tbody) return;
+  try {
+    const sales = await apiRequest('/sales?limit=100');
+    DB.sales = sales.map(s => ({
+      id: String(s.id),
+      invoice: s.client_sale_id || ('SALE-' + s.id),
+      rawDate: s.created_at,
+      date: new Date(s.created_at).toLocaleString(),
+      items: (s.items || []).map(item => ({ product_id: item.product_id, name: 'Product #' + item.product_id, qty: item.quantity, price: Number(item.unit_price) })),
+      payment: s.source === 'desktop_offline' ? 'offline' : 'cash',
+      subtotal: Number(s.total_amount),
+      discount: 0,
+      total: Number(s.total_amount),
+      profit: Number(s.total_profit),
+      paid: Number(s.total_amount),
+      change: 0,
+      status: 'completed'
+    }));
+    const rows = filteredSales();
+    tbody.innerHTML = rows.length ? rows.map(s => `<tr>
+      <td class="text-mono" style="font-weight:600;font-size:11px">${s.invoice}</td>
+      <td style="font-size:11px">${s.date}</td>
+      <td>${s.items.length} items</td>
+      <td><span class="badge badge-blue">${s.payment}</span></td>
+      <td class="text-mono" style="color:var(--green);font-weight:700">Rs.${s.total.toLocaleString()}</td>
+      <td class="text-mono" style="color:var(--blue2)">Rs.${s.profit.toLocaleString()}</td>
+      <td><span class="badge badge-green">${s.status}</span></td>
+      <td><button class="btn btn-outline btn-xs" onclick="viewSaleDetail('${s.id}')">View</button></td>
+    </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text3)">No sales found</td></tr>';
+    updateStatCards();
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function viewSaleDetail(id){
+  const s = DB.sales.find(x => x.id === String(id));
+  if (!s) return showToast('Sale not found', 'error');
+  showReceipt(s);
+}
+
+function exportSalesCsv() {
+  const rows = [['Invoice','Date','Items','Payment','Amount','Profit','Status'], ...filteredSales().map(s => [s.invoice,s.date,s.items.length,s.payment,s.total,s.profit,s.status])];
+  downloadCsv('abiz-sales.csv', rows);
+  showToast('Sales CSV downloaded', 'success');
+}
+
+async function renderLedger() {
+  try {
+    const entries = await apiRequest('/digi-khata?limit=100');
+    const today = todayKey();
+    const month = today.slice(0,7);
+    const todayEntry = entries.find(e => e.date === today);
+    const monthEntries = entries.filter(e => String(e.date).startsWith(month));
+    const todayIncome = Number(todayEntry?.total_sales || 0);
+    const todayProfit = Number(todayEntry?.total_profit || 0);
+    const monthProfit = monthEntries.reduce((a,e)=>a + Number(e.total_profit || 0),0);
+    document.getElementById('lk-income').textContent = 'Rs.' + todayIncome.toLocaleString();
+    document.getElementById('lk-expense').textContent = 'Rs.0';
+    document.getElementById('lk-profit').textContent = 'Rs.' + todayProfit.toLocaleString();
+    document.getElementById('lk-monthly').textContent = 'Rs.' + monthProfit.toLocaleString();
+    const tbody = document.getElementById('ledger-tbody');
+    if (tbody) {
+      tbody.innerHTML = entries.map(e => `<tr>
+        <td style="font-size:11px">${e.date}</td>
+        <td><span class="badge badge-green">sales</span></td>
+        <td style="font-size:12px">Daily sales total</td>
+        <td class="text-mono" style="font-weight:700;color:var(--green)">Rs.${Number(e.total_sales).toLocaleString()} | Profit Rs.${Number(e.total_profit).toLocaleString()}</td>
+      </tr>`).join('');
+    }
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function addLedgerEntry(){
+  showToast('Manual Digi Khata entries are local-only in this build. Sales entries update automatically after checkout.', 'info');
+}
+
+function renderReports(){
+  const rows = filteredSales();
+  const revenue = rows.reduce((a,s)=>a + Number(s.total || 0),0);
+  const profit = rows.reduce((a,s)=>a + Number(s.profit || 0),0);
+  const cost = revenue - profit;
+  const tbody = document.getElementById('report-tbody');
+  if(tbody) tbody.innerHTML = `<tr><td>Selected Period</td><td>${rows.length}</td><td>Rs.${revenue.toLocaleString()}</td><td>Rs.${cost.toLocaleString()}</td><td>Rs.${profit.toLocaleString()}</td><td>${revenue ? Math.round((profit/revenue)*100) : 0}%</td></tr>`;
+}
+
+function exportReportCsv(){
+  const rows = filteredSales();
+  downloadCsv('abiz-report.csv', [['Invoice','Date','Revenue','Profit'], ...rows.map(s => [s.invoice,s.date,s.total,s.profit])]);
+  showToast('Report CSV downloaded', 'success');
+}
+
+function globalSearch(val){
+  const search = String(val || '').trim().toLowerCase();
+  if(search.length < 2) return;
+  if(DB.products.some(p => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search))){
+    document.getElementById('pos-search').value = val;
+    showPage('pos');
+    filterPosProducts(val);
+    return;
+  }
+  if(DB.sales.some(s => String(s.invoice).toLowerCase().includes(search))){
+    document.getElementById('sales-search').value = val;
+    showPage('sales');
+    renderSalesTable();
+  }
+}
+
+function getReceiptSettings(){
+  return JSON.parse(localStorage.getItem('abiz_receipt_settings') || '{"title":"ABIZ Global Services","fontSize":"12","footer":"Thank you for your purchase!"}');
+}
+
+function editReceiptSettings(){
+  const settings = getReceiptSettings();
+  const title = prompt('Receipt title', settings.title) || settings.title;
+  const fontSize = prompt('Receipt font size', settings.fontSize) || settings.fontSize;
+  const footer = prompt('Receipt footer text', settings.footer) || settings.footer;
+  localStorage.setItem('abiz_receipt_settings', JSON.stringify({ title, fontSize, footer }));
+  showToast('Receipt settings saved', 'success');
+}
+
+function showReceipt(sale){
+  const settings = getReceiptSettings();
+  document.getElementById('receipt-content').innerHTML=`
+    <div class="receipt-box" style="font-size:${Number(settings.fontSize) || 12}px">
+      <div class="receipt-header">
+        <div class="receipt-logo">${settings.title}</div>
+        <div style="font-size:10px;margin-top:4px;color:#666">POS System | Tax Invoice</div>
+        <div style="font-size:10px;margin-top:6px;color:#666"><div><b>Invoice:</b> ${sale.invoice}</div><div><b>Date:</b> ${sale.date}</div><div><b>Payment:</b> ${(sale.payment || 'cash').toUpperCase()}</div></div>
+      </div>
+      <div style="margin:10px 0">
+        <div class="ri-row header"><span>Item</span><span>Qty</span><span>Price</span><span>Total</span></div>
+        ${(sale.items || []).map(i=>`<div class="ri-row"><span style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${i.name || ('Product #' + i.product_id)}</span><span>${i.qty || i.quantity}</span><span>Rs.${Number(i.price || i.unit_price || 0).toLocaleString()}</span><span>Rs.${(Number(i.price || i.unit_price || 0)*Number(i.qty || i.quantity || 1)).toLocaleString()}</span></div>`).join('')}
+      </div>
+      <div class="receipt-total">
+        <div class="rt-row"><span>Subtotal</span><span>Rs. ${Number(sale.subtotal || sale.total || 0).toLocaleString()}</span></div>
+        ${sale.discount?`<div class="rt-row"><span>Discount</span><span style="color:#EF4444">- Rs. ${Number(sale.discount).toLocaleString()}</span></div>`:''}
+        <div class="rt-row grand"><span>TOTAL</span><span>Rs. ${Number(sale.total || 0).toLocaleString()}</span></div>
+      </div>
+      <div class="receipt-footer">${settings.footer}<br><b>abizglobalservices.com</b></div>
+    </div>`;
+  openModal('modal-receipt');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

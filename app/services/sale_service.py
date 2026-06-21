@@ -143,6 +143,10 @@ def sync_offline_sales(db: Session, offline_sales: list[OfflineSaleCreate]) -> l
             )
             continue
 
+        discount = max(Decimal("0.00"), offline_sale.discount or Decimal("0.00"))
+        total_amount = max(Decimal("0.00"), total_amount - discount)
+        total_profit = total_profit - discount
+
         sale = Sale(
             client_sale_id=offline_sale.client_sale_id,
             source="desktop_offline",
