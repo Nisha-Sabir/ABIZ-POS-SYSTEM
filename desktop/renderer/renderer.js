@@ -89,8 +89,24 @@ function money(value) {
 
 async function setStatus(message, ok = true) {
   const pending = await localDb.listPendingSales();
-  $('status').textContent = `${navigator.onLine ? 'Online' : 'Offline'} | Pending: ${pending.length} | ${message}`;
+  if ($('connection-dot')) $('connection-dot').classList.toggle('online', navigator.onLine);
+  if ($('connection-label')) $('connection-label').textContent = navigator.onLine ? 'Online' : 'Offline';
+  if ($('pending-pill')) $('pending-pill').textContent = `Pending: ${pending.length}`;
+  $('status').textContent = message;
   $('status').className = ok ? 'ok' : 'bad';
+}
+
+async function isLoggedIn() {
+  return Boolean(await localDb.getSetting('auth_token'));
+}
+
+async function updateAuthState() {
+  const loggedIn = await isLoggedIn();
+  $('terminal-area')?.classList.toggle('locked', !loggedIn);
+  if ($('login-btn')) $('login-btn').style.display = loggedIn ? 'none' : 'inline-flex';
+  if ($('logout-btn')) $('logout-btn').style.display = loggedIn ? 'inline-flex' : 'none';
+  if ($('scanner-input') && loggedIn) $('scanner-input').focus();
+  return loggedIn;
 }
 
 function renderCart() {
@@ -101,7 +117,7 @@ function renderCart() {
           <strong>${item.name}</strong>
           <small>${item.qr_code}</small>
         </div>
-        <div>${item.quantity} x ${money(item.sale_price)}</div>
+        <div><strong>${money(item.sale_price * item.quantity)}</strong><small>${item.quantity} x ${money(item.sale_price)}</small></div>
       </div>
     `).join('')
     : '<p class="empty">No items added.</p>';
@@ -112,6 +128,7 @@ function renderCart() {
   const paid = Number($('amount-paid')?.value || 0);
   $('total').textContent = money(payable);
   if ($('change-amount')) $('change-amount').textContent = money(Math.max(0, paid - payable));
+  if ($('cart-count')) $('cart-count').textContent = `${state.cart.reduce((a, item) => a + item.quantity, 0)} items`;
 }
 
 function renderProducts() {
@@ -161,8 +178,18 @@ async function login() {
   });
   await localDb.setSetting('auth_token', token.access_token);
   await localDb.setSetting('login_email', email);
+  await localDb.setSetting('last_login_at', new Date().toISOString());
   await syncProducts();
+  await updateAuthState();
   await setStatus('Logged in and products synced.');
+}
+
+async function logout() {
+  await localDb.setSetting('auth_token', '');
+  state.cart = [];
+  renderCart();
+  await updateAuthState();
+  await setStatus('Logged out. Login required for offline POS.', false);
 }
 
 async function scanProduct(code) {
@@ -181,6 +208,7 @@ async function scanProduct(code) {
 }
 
 async function syncProducts() {
+  if (!await updateAuthState()) throw new Error('Please login first.');
   const products = await api('/products?limit=100');
   await localDb.putProducts(products);
   await refreshProducts();
@@ -188,6 +216,7 @@ async function syncProducts() {
 }
 
 async function syncSales() {
+  if (!await updateAuthState()) throw new Error('Please login first.');
   const pending = await localDb.listPendingSales();
   if (!pending.length) {
     await setStatus('No pending offline sales.');
@@ -240,6 +269,10 @@ function printInvoice(sale) {
 }
 
 async function checkout() {
+  if (!await updateAuthState()) {
+    await setStatus('Please login before checkout.', false);
+    return;
+  }
   if (!state.cart.length) {
     await setStatus('Cart is empty.', false);
     return;
@@ -269,7 +302,8 @@ async function loadSettings() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  $('scanner-input').focus();
+  $('backend-url').value = await localDb.getSetting('backend_url');
+  $('login-email').value = await localDb.getSetting('login_email');
   $('scanner-input').addEventListener('keydown', async (event) => {
     if (event.key !== 'Enter') return;
     const code = event.target.value.trim();
@@ -282,20 +316,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('clear-cart').addEventListener('click', () => { state.cart = []; renderCart(); });
   $('discount-input')?.addEventListener('input', renderCart);
   $('amount-paid')?.addEventListener('input', renderCart);
-  $('settings-btn').addEventListener('click', async () => { await loadSettings(); $('settings-dialog').showModal(); });
+  $('settings-btn')?.addEventListener('click', async () => {
+    const url = prompt('Backend URL', await localDb.getSetting('backend_url'));
+    if (url) {
+      await localDb.setSetting('backend_url', url.trim());
+      $('backend-url').value = url.trim();
+      await setStatus('Backend URL saved.');
+    }
+  });
   $('login-btn').addEventListener('click', async () => {
     $('login-email').value = await localDb.getSetting('login_email');
-    $('login-dialog').showModal();
+    $('login-password').focus();
   });
-  $('save-settings').addEventListener('click', async () => {
+  $('save-settings')?.addEventListener('click', async () => {
     await localDb.setSetting('backend_url', $('backend-url').value.trim());
     await setStatus('Settings saved.');
   });
   $('do-login').addEventListener('click', () => login().catch((error) => setStatus(error.message, false)));
+  $('login-password')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') login().catch((error) => setStatus(error.message, false));
+  });
+  $('logout-btn')?.addEventListener('click', () => logout().catch((error) => setStatus(error.message, false)));
   window.addEventListener('online', tryAutoSync);
   window.addEventListener('offline', () => setStatus('Offline mode active.'));
   setInterval(tryAutoSync, 60000);
   await refreshProducts();
   renderCart();
+  await updateAuthState();
   await setStatus('Desktop app ready.');
 });

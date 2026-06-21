@@ -6,96 +6,109 @@
   <title>ABIZ POS Offline Terminal</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-  <main class="shell">
-    <section class="topbar">
-      <div>
-        <h1>ABIZ POS Offline Terminal</h1>
-        <p id="status">Offline-ready sales terminal</p>
-      </div>
-      <div class="actions">
-        <a class="link-button secondary" href="index.html">Dashboard</a>
-        <button id="login-btn">Login</button>
-        <button id="sync-products">Sync Products</button>
-        <button id="sync-sales">Sync Sales</button>
-        <button id="settings-btn">Settings</button>
-      </div>
-    </section>
-
-    <section class="grid">
-      <div class="panel">
-        <h2>Scanner</h2>
-        <input id="scanner-input" autocomplete="off" placeholder="Scan QR/barcode with USB scanner">
-        <p class="hint">USB scanner works like keyboard input. Keep this field focused and scan.</p>
-        <div id="product-result" class="result"></div>
+<body class="offline-body">
+  <main class="offline-shell">
+    <aside class="offline-sidebar">
+      <div class="offline-brand">
+        <div class="brand-mark">AB</div>
+        <div>
+          <h1>ABIZ POS</h1>
+          <p>Offline Sales Terminal</p>
+        </div>
       </div>
 
-      <div class="panel">
-        <h2>Cart</h2>
-        <div id="cart-list" class="cart"></div>
-        <div class="totals">
-          <span>Total</span>
-          <strong id="total">0.00</strong>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Discount</label>
-          <input id="discount-input" type="number" min="0" value="0">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Payment Method</label>
-          <select id="payment-method" class="form-control">
-            <option value="cash">Cash</option>
-            <option value="card">Card</option>
-            <option value="easypaisa">EasyPaisa</option>
-            <option value="jazzcash">JazzCash</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Amount Paid</label>
-          <input id="amount-paid" type="number" min="0" value="0">
-        </div>
-        <div class="totals">
-          <span>Change</span>
-          <strong id="change-amount">0.00</strong>
-        </div>
-        <div class="row">
-          <button id="clear-cart" class="secondary">Clear</button>
-          <button id="checkout">Save Sale & Print</button>
+      <div class="status-card">
+        <span class="status-dot" id="connection-dot"></span>
+        <div>
+          <strong id="connection-label">Checking...</strong>
+          <small id="status">Preparing terminal</small>
         </div>
       </div>
-    </section>
 
-    <section class="panel">
-      <h2>Local Products</h2>
-      <div id="products-list" class="products"></div>
+      <section class="side-panel" id="login-panel">
+        <h2>Login</h2>
+        <label>Backend URL</label>
+        <input id="backend-url" placeholder="https://your-app.up.railway.app/api/v1">
+        <label>Email</label>
+        <input id="login-email" type="email" placeholder="admin@example.com">
+        <label>Password</label>
+        <input id="login-password" type="password" placeholder="Password">
+        <button id="do-login" class="wide">Login & Sync</button>
+        <button id="logout-btn" class="wide secondary" style="display:none">Logout</button>
+      </section>
+
+      <section class="side-panel">
+        <h2>Sync</h2>
+        <button id="sync-products" class="wide">Sync Products</button>
+        <button id="sync-sales" class="wide secondary">Sync Sales</button>
+        <a class="link-button wide secondary" href="index.html">Online Dashboard</a>
+      </section>
+    </aside>
+
+    <section class="terminal-area locked" id="terminal-area">
+      <div class="terminal-header">
+        <div>
+          <h2>Sales Counter</h2>
+          <p>Scan USB QR/barcode, complete sale, print invoice, sync when internet is available.</p>
+        </div>
+        <div class="pending-pill" id="pending-pill">Pending: 0</div>
+      </div>
+
+      <div class="terminal-grid">
+        <section class="panel scanner-panel">
+          <div class="panel-head">
+            <h2>Scanner</h2>
+            <span>USB keyboard scanner</span>
+          </div>
+          <input id="scanner-input" autocomplete="off" placeholder="Scan QR/barcode here">
+          <div id="product-result" class="result">Keep cursor in this field and scan.</div>
+        </section>
+
+        <section class="panel cart-panel-modern">
+          <div class="panel-head">
+            <h2>Cart</h2>
+            <span id="cart-count">0 items</span>
+          </div>
+          <div id="cart-list" class="cart"></div>
+
+          <div class="checkout-grid">
+            <label>Discount
+              <input id="discount-input" type="number" min="0" value="0">
+            </label>
+            <label>Payment
+              <select id="payment-method" class="form-control">
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="easypaisa">EasyPaisa</option>
+                <option value="jazzcash">JazzCash</option>
+              </select>
+            </label>
+            <label>Amount Paid
+              <input id="amount-paid" type="number" min="0" value="0">
+            </label>
+          </div>
+
+          <div class="summary-box">
+            <div><span>Total</span><strong id="total">0.00</strong></div>
+            <div><span>Change</span><strong id="change-amount">0.00</strong></div>
+          </div>
+
+          <div class="row">
+            <button id="clear-cart" class="secondary">Clear Cart</button>
+            <button id="checkout">Save Sale & Print</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel products-panel">
+        <div class="panel-head">
+          <h2>Local Products</h2>
+          <span>Available offline after sync</span>
+        </div>
+        <div id="products-list" class="products"></div>
+      </section>
     </section>
   </main>
-
-  <dialog id="settings-dialog">
-    <form method="dialog">
-      <h2>Server Settings</h2>
-      <label>Backend URL</label>
-      <input id="backend-url" placeholder="https://your-app.up.railway.app/api/v1">
-      <div class="row">
-        <button value="cancel" class="secondary">Cancel</button>
-        <button id="save-settings" value="default">Save</button>
-      </div>
-    </form>
-  </dialog>
-
-  <dialog id="login-dialog">
-    <form method="dialog">
-      <h2>Login</h2>
-      <label>Email</label>
-      <input id="login-email" type="email" placeholder="admin@example.com">
-      <label>Password</label>
-      <input id="login-password" type="password" placeholder="Password">
-      <div class="row">
-        <button value="cancel" class="secondary">Cancel</button>
-        <button id="do-login" value="default">Login</button>
-      </div>
-    </form>
-  </dialog>
 
   <script src="renderer.js"></script>
 </body>
