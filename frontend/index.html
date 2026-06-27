@@ -2491,7 +2491,7 @@ async function manualScan() {
   try {
     const p = await apiRequest('/sales/scan/' + encodeURIComponent(val));
     el.style.display = 'block';
-    el.innerHTML = `<div class="card card-sm"><div class="flex gap-2 mb-4"><div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(0,212,255,.1));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue2)">${p.name.slice(0,2).toUpperCase()}</div><div><div style="font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--text3)">QR: ${p.qr_code}</div></div></div><div class="form-row"><div><div style="font-size:10px;color:var(--text3)">PRICE</div><div style="font-size:18px;font-weight:800;color:var(--green)">Rs.${Number(p.sale_price).toLocaleString()}</div></div><div><div style="font-size:10px;color:var(--text3)">STOCK</div><div style="font-size:18px;font-weight:800;color:var(--blue2)">${p.available_stock} pcs</div></div></div><button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="addToCart('${p.product_id}');showPage('pos')">Add to POS Cart</button></div>`;
+    el.innerHTML = `<div class="card card-sm"><div class="flex gap-2 mb-4"><div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(0,212,255,.1));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue2)">${p.name.slice(0,2).toUpperCase()}</div><div><div style="font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--text3)">QR: ${p.qr_code}</div></div></div><div class="form-row"><div><div style="font-size:10px;color:var(--text3)">PRICE</div><div style="font-size:18px;font-weight:800;color:var(--green)">Rs.${Number(p.sale_price).toLocaleString()}</div></div><div><div style="font-size:10px;color:var(--text3)">STOCK</div><div style="font-size:18px;font-weight:800;color:var(--blue2)">${p.available_stock} pcs</div></div></div><button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="addScannedProductToCart('${p.qr_code}')">Add to POS Cart</button></div>`;
     showToast('Product found: ' + p.name, 'success');
   } catch (error) {
     el.style.display = 'block';
@@ -2521,11 +2521,14 @@ function parseSaleDate(value) {
 }
 
 function dateKey(value) {
-  return parseSaleDate(value).toISOString().slice(0, 10);
+  const d = parseSaleDate(value);
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${month}-${day}`;
 }
 
 function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+  return dateKey(new Date());
 }
 
 function downloadCsv(filename, rows) {
@@ -2537,6 +2540,45 @@ function downloadCsv(filename, rows) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+async function addScannedProductToCart(qrCode) {
+  try {
+    await apiRequest('/sales/cart/items', {
+      method: 'POST',
+      body: JSON.stringify({ qr_code: qrCode, quantity: 1 })
+    });
+    await loadBackendCart();
+    showPage('pos');
+    showToast('Scanned product added to cart', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+function mapBackendSale(s) {
+  return {
+    id: String(s.id),
+    invoice: s.client_sale_id || ('SALE-' + s.id),
+    rawDate: s.created_at,
+    date: new Date(s.created_at).toLocaleString(),
+    items: (s.items || []).map(item => ({ product_id: item.product_id, name: 'Product #' + item.product_id, qty: item.quantity, price: Number(item.unit_price) })),
+    payment: s.source === 'desktop_offline' ? 'offline' : 'cash',
+    subtotal: Number(s.total_amount),
+    discount: 0,
+    total: Number(s.total_amount),
+    profit: Number(s.total_profit),
+    paid: Number(s.total_amount),
+    change: 0,
+    status: 'completed'
+  };
+}
+
+async function refreshSalesData() {
+  const sales = await apiRequest('/sales?limit=100');
+  DB.sales = sales.map(mapBackendSale);
+  updateStatCards();
+  renderRecentTxns();
 }
 
 function filteredSales() {
@@ -2589,6 +2631,7 @@ function renderDashboard(){
   updateStatCards();
   renderTopProducts();
   renderRecentTxns();
+  if (authToken) refreshSalesData().catch(() => {});
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const tc=isDark?'#94A3B8':'#475569';
   const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
@@ -2611,21 +2654,7 @@ async function renderSalesTable() {
   if (!tbody) return;
   try {
     const sales = await apiRequest('/sales?limit=100');
-    DB.sales = sales.map(s => ({
-      id: String(s.id),
-      invoice: s.client_sale_id || ('SALE-' + s.id),
-      rawDate: s.created_at,
-      date: new Date(s.created_at).toLocaleString(),
-      items: (s.items || []).map(item => ({ product_id: item.product_id, name: 'Product #' + item.product_id, qty: item.quantity, price: Number(item.unit_price) })),
-      payment: s.source === 'desktop_offline' ? 'offline' : 'cash',
-      subtotal: Number(s.total_amount),
-      discount: 0,
-      total: Number(s.total_amount),
-      profit: Number(s.total_profit),
-      paid: Number(s.total_amount),
-      change: 0,
-      status: 'completed'
-    }));
+    DB.sales = sales.map(mapBackendSale);
     const rows = filteredSales();
     tbody.innerHTML = rows.length ? rows.map(s => `<tr>
       <td class="text-mono" style="font-weight:600;font-size:11px">${s.invoice}</td>
