@@ -3,6 +3,7 @@ const state = {
   products: []
 };
 
+const DEFAULT_BACKEND_URL = 'https://abiz-pos-system-production-02e4.up.railway.app/api/v1';
 const $ = (id) => document.getElementById(id);
 
 const localDb = (() => {
@@ -153,7 +154,7 @@ async function getBackendConfig() {
   const sharedUrl = localStorage.getItem('abiz_api_base') || '';
   if (!savedUrl && sharedUrl) await localDb.setSetting('backend_url', sharedUrl);
   return {
-    baseUrl: savedUrl || sharedUrl,
+    baseUrl: savedUrl || sharedUrl || DEFAULT_BACKEND_URL,
     token: await localDb.getSetting('auth_token')
   };
 }
@@ -163,7 +164,20 @@ async function api(path, options = {}) {
   if (!baseUrl) throw new Error('Backend URL missing in Settings.');
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(baseUrl.replace(/\/$/, '') + path, { ...options, headers });
+  const request = {
+    url: baseUrl.replace(/\/$/, '') + path,
+    method: options.method || 'GET',
+    headers,
+    body: options.body || undefined
+  };
+  if (window.abizDesktop?.apiRequest) {
+    const response = await window.abizDesktop.apiRequest(request);
+    if (!response.ok) {
+      throw new Error(response.data?.detail || response.data || 'Server request failed.');
+    }
+    return response.data;
+  }
+  const response = await fetch(request.url, { ...options, headers });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     throw new Error(data.detail || 'Server request failed.');
@@ -186,8 +200,9 @@ async function login() {
   });
   await localDb.setSetting('auth_token', token.access_token);
   await localDb.setSetting('login_email', email);
-  await localDb.setSetting('login_password', password);
+  await localDb.setSetting('login_password', '');
   await localDb.setSetting('last_login_at', new Date().toISOString());
+  $('login-password').value = '';
   await syncProducts();
   await updateAuthState();
   await setStatus('Logged in and products synced.');
@@ -307,13 +322,14 @@ async function checkout() {
 }
 
 async function loadSettings() {
-  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || DEFAULT_BACKEND_URL;
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || DEFAULT_BACKEND_URL;
   $('login-email').value = await localDb.getSetting('login_email');
-  $('login-password').value = await localDb.getSetting('login_password');
+  $('login-password').value = '';
+  await localDb.setSetting('login_password', '');
   $('scanner-input').addEventListener('keydown', async (event) => {
     if (event.key !== 'Enter') return;
     const code = event.target.value.trim();
@@ -336,7 +352,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('login-btn').addEventListener('click', async () => {
     $('login-email').value = await localDb.getSetting('login_email');
-    $('login-password').value = await localDb.getSetting('login_password');
+    $('login-password').value = '';
     $('login-password').focus();
   });
   $('save-settings')?.addEventListener('click', async () => {
@@ -354,8 +370,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await refreshProducts();
   renderCart();
   const loggedIn = await updateAuthState();
-  if (!loggedIn && navigator.onLine && $('backend-url').value && $('login-email').value && $('login-password').value) {
-    login().catch(() => setStatus('Saved login found. Click Login & Sync to refresh access.', false));
+  if (!loggedIn && navigator.onLine && $('backend-url').value && $('login-email').value) {
+    setStatus('Enter password and click Login & Sync. Password is not saved for security.', false);
+  } else {
+    await setStatus('Desktop app ready.');
   }
-  await setStatus('Desktop app ready.');
 });

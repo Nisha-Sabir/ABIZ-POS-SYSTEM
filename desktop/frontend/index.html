@@ -523,7 +523,7 @@ textarea.form-control{resize:vertical}
           <div class="card">
             <div class="flex-between mb-4">
               <div class="section-title" style="margin:0">Sales — Last 7 Days</div>
-              <select class="form-control" style="width:auto;padding:5px 10px;font-size:11px"><option>Weekly</option><option>Monthly</option></select>
+              <select class="form-control" id="dashboard-period" onchange="renderDashboard()" style="width:auto;padding:5px 10px;font-size:11px"><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>
             </div>
             <div class="chart-wrap"><canvas id="salesChart"></canvas></div>
           </div>
@@ -870,7 +870,7 @@ textarea.form-control{resize:vertical}
               <div class="section-title">Quick Actions</div>
               <div style="display:flex;flex-direction:column;gap:8px">
                 <button class="btn btn-outline" onclick="showToast('Cache cleared','success')">Clear System Cache</button>
-                <button class="btn btn-outline" onclick="showToast('Receipt settings opened','info')">Receipt Settings</button>
+                <button class="btn btn-outline" onclick="editReceiptSettings()">Receipt Settings</button>
                 <button class="btn btn-outline" onclick="showToast('Tax settings saved','success')">Tax Configuration</button>
                 <button class="btn btn-outline" onclick="showToast('Currency updated','success')">Currency Settings</button>
                 <button class="btn btn-danger" onclick="showToast('System reset — demo only','info')">Reset to Defaults</button>
@@ -974,7 +974,7 @@ textarea.form-control{resize:vertical}
       <input type="hidden" id="prod-edit-id"/>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Product Name *</label><input class="form-control" id="prod-name" placeholder="Product name"/></div>
-        <div class="form-group"><label class="form-label">SKU</label><input class="form-control" id="prod-sku" placeholder="Auto if empty"/></div>
+        <div class="form-group"><label class="form-label">SKU / Barcode</label><div class="flex gap-2"><input class="form-control" id="prod-sku" placeholder="Scan barcode or auto if empty" onkeydown="handleSkuScanKey(event)"/><button type="button" class="btn btn-outline btn-sm" onclick="prepareSkuScan()">Scan</button></div></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Category</label><select class="form-control" id="prod-category"></select></div>
@@ -1039,6 +1039,28 @@ textarea.form-control{resize:vertical}
       <button class="btn btn-outline" onclick="editReceiptSettings()">Customize</button>
       <button class="btn btn-outline" onclick="closeModal('modal-receipt')">Close</button>
       <button class="btn btn-primary" onclick="window.print()">Print Receipt</button>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Settings -->
+<div class="modal-overlay" id="modal-receipt-settings">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">Receipt Settings</div>
+      <span class="modal-close" onclick="closeModal('modal-receipt-settings')">x</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Business / Receipt Title</label><input class="form-control" id="receipt-title" placeholder="ABIZ Global Services"/></div>
+      <div class="form-group"><label class="form-label">Footer Message</label><textarea class="form-control" id="receipt-footer" rows="3" placeholder="Thank you for your purchase!"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Font Size</label><input class="form-control" id="receipt-font-size" type="number" min="10" max="18" value="12"/></div>
+        <div class="form-group"><label class="form-label">Phone / Website</label><input class="form-control" id="receipt-contact" placeholder="abizglobalservices.com"/></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-receipt-settings')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveReceiptSettings()">Save Receipt</button>
     </div>
   </div>
 </div>
@@ -2575,17 +2597,25 @@ function mapBackendSale(s) {
 }
 
 async function refreshSalesData() {
-  const sales = await apiRequest('/sales?limit=100');
-  DB.sales = sales.map(mapBackendSale);
+  const sales = await apiRequest('/sales?limit=500');
+  DB.sales = (sales || []).map(mapBackendSale);
   updateStatCards();
   renderRecentTxns();
 }
 
-function filteredSales() {
-  const from = document.getElementById('sales-date-from')?.value || '';
-  const to = document.getElementById('sales-date-to')?.value || '';
-  const payment = (document.getElementById('sales-payment-filter')?.value || '').toLowerCase();
-  const search = (document.getElementById('sales-search')?.value || '').toLowerCase();
+function getLocalExpenses() {
+  return JSON.parse(localStorage.getItem('abiz_local_ledger_entries') || '[]');
+}
+
+function saveLocalExpenses(entries) {
+  localStorage.setItem('abiz_local_ledger_entries', JSON.stringify(entries));
+}
+
+function filteredSales(scope = 'sales') {
+  const from = document.getElementById(scope === 'report' ? 'report-date-from' : 'sales-date-from')?.value || '';
+  const to = document.getElementById(scope === 'report' ? 'report-date-to' : 'sales-date-to')?.value || '';
+  const payment = scope === 'report' ? '' : (document.getElementById('sales-payment-filter')?.value || '').toLowerCase();
+  const search = scope === 'report' ? '' : (document.getElementById('sales-search')?.value || '').toLowerCase();
   return DB.sales.filter(s => {
     const key = dateKey(s.rawDate || s.date);
     const inFrom = !from || key >= from;
@@ -2601,10 +2631,18 @@ function updateStatCards(){
   const todaySales = DB.sales.filter(s => dateKey(s.rawDate || s.date) === today);
   const todayRevenue = todaySales.reduce((a,s)=>a + Number(s.total || 0),0);
   const todayProfit = todaySales.reduce((a,s)=>a + Number(s.profit || 0),0);
+  const currentMonth = today.slice(0,7);
+  const monthlyRevenue = DB.sales
+    .filter(s => dateKey(s.rawDate || s.date).slice(0,7) === currentMonth)
+    .reduce((a,s)=>a + Number(s.total || 0),0);
   document.getElementById('s-products').textContent = DB.products.length;
   document.getElementById('s-sales').textContent = todaySales.length;
   document.getElementById('s-revenue').textContent = 'Rs.' + todayRevenue.toLocaleString();
-  document.getElementById('s-monthly').textContent = 'Rs.' + todayProfit.toLocaleString();
+  document.getElementById('s-monthly').textContent = 'Rs.' + monthlyRevenue.toLocaleString();
+  document.querySelector('#s-products')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode(DB.products.length ? 'Synced from inventory' : 'No products loaded'));
+  document.querySelector('#s-sales')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode('Only today sales counted'));
+  document.querySelector('#s-revenue')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode('Profit Rs.' + todayProfit.toLocaleString()));
+  document.querySelector('#s-monthly')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode('Current month revenue'));
   const low = DB.products.filter(p=>Number(p.stock || 0) <= Number(p.minStock || 10)).length;
   document.getElementById('s-alerts').textContent = low;
   const badge=document.getElementById('inv-badge');
@@ -2627,25 +2665,51 @@ function renderRecentTxns(){
     </div>`).join('') : '<div class="empty" style="padding:12px">No recent transactions</div>';
 }
 
-function renderDashboard(){
+async function renderDashboard(){
+  if (authToken) {
+    await refreshSalesData().catch(() => {});
+    await loadBackendData().catch(() => {});
+  }
   updateStatCards();
   renderTopProducts();
   renderRecentTxns();
-  if (authToken) refreshSalesData().catch(() => {});
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const tc=isDark?'#94A3B8':'#475569';
   const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
-  const last7 = Array.from({length:7}, (_,i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
-    return d.toISOString().slice(0,10);
-  });
-  const salesData = last7.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date) === k).reduce((a,s)=>a + Number(s.total || 0),0));
-  const profitData = last7.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date) === k).reduce((a,s)=>a + Number(s.profit || 0),0));
+  const period = document.getElementById('dashboard-period')?.value || 'weekly';
+  const labels = period === 'monthly'
+    ? Array.from({length:6}, (_,i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - (5 - i));
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
+      })
+    : Array.from({length:7}, (_,i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - (6 - i));
+        return dateKey(d);
+      });
+  const matchesPeriod = (sale, key) => {
+    const saleKey = dateKey(sale.rawDate || sale.date);
+    return period === 'monthly' ? saleKey.startsWith(key) : saleKey === key;
+  };
+  const salesData = labels.map(k => DB.sales.filter(s => matchesPeriod(s, k)).reduce((a,s)=>a + Number(s.total || 0),0));
+  const profitData = labels.map(k => DB.sales.filter(s => matchesPeriod(s, k)).reduce((a,s)=>a + Number(s.profit || 0),0));
   const ctx=document.getElementById('salesChart');
   if(ctx){
     if(salesChartInst)salesChartInst.destroy();
-    salesChartInst=new Chart(ctx,{type:'bar',data:{labels:last7.map(k=>k.slice(5)),datasets:[{label:'Sales',data:salesData,backgroundColor:'rgba(37,99,235,0.7)',borderRadius:5},{label:'Profit',data:profitData,backgroundColor:'rgba(16,185,129,0.7)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+    salesChartInst=new Chart(ctx,{type:'bar',data:{labels:labels.map(k=>period === 'monthly' ? k.slice(5) : k.slice(5)),datasets:[{label:'Sales',data:salesData,backgroundColor:'rgba(37,99,235,0.7)',borderRadius:5},{label:'Profit',data:profitData,backgroundColor:'rgba(16,185,129,0.7)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+  }
+  const split = DB.sales.reduce((acc, sale) => {
+    const key = String(sale.payment || 'cash').toUpperCase();
+    acc[key] = (acc[key] || 0) + Number(sale.total || 0);
+    return acc;
+  }, {});
+  const splitLabels = Object.keys(split).length ? Object.keys(split) : ['No Sales'];
+  const splitValues = Object.keys(split).length ? Object.values(split) : [0];
+  const ctx2=document.getElementById('splitChart');
+  if(ctx2){
+    if(splitChartInst)splitChartInst.destroy();
+    splitChartInst=new Chart(ctx2,{type:'doughnut',data:{labels:splitLabels,datasets:[{data:splitValues,backgroundColor:['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});
   }
 }
 
@@ -2687,25 +2751,36 @@ function exportSalesCsv() {
 async function renderLedger() {
   try {
     const entries = await apiRequest('/digi-khata?limit=100');
+    const manualEntries = getLocalExpenses();
     const today = todayKey();
     const month = today.slice(0,7);
     const todayEntry = entries.find(e => e.date === today);
     const monthEntries = entries.filter(e => String(e.date).startsWith(month));
+    const todayExpense = manualEntries.filter(e => e.type === 'expense' && e.date === today).reduce((a,e)=>a + Number(e.amount || 0),0);
+    const todayManualIncome = manualEntries.filter(e => e.type === 'income' && e.date === today).reduce((a,e)=>a + Number(e.amount || 0),0);
+    const monthExpense = manualEntries.filter(e => e.type === 'expense' && String(e.date).startsWith(month)).reduce((a,e)=>a + Number(e.amount || 0),0);
     const todayIncome = Number(todayEntry?.total_sales || 0);
     const todayProfit = Number(todayEntry?.total_profit || 0);
     const monthProfit = monthEntries.reduce((a,e)=>a + Number(e.total_profit || 0),0);
-    document.getElementById('lk-income').textContent = 'Rs.' + todayIncome.toLocaleString();
-    document.getElementById('lk-expense').textContent = 'Rs.0';
-    document.getElementById('lk-profit').textContent = 'Rs.' + todayProfit.toLocaleString();
-    document.getElementById('lk-monthly').textContent = 'Rs.' + monthProfit.toLocaleString();
+    document.getElementById('lk-income').textContent = 'Rs.' + (todayIncome + todayManualIncome).toLocaleString();
+    document.getElementById('lk-expense').textContent = 'Rs.' + todayExpense.toLocaleString();
+    document.getElementById('lk-profit').textContent = 'Rs.' + (todayProfit + todayManualIncome - todayExpense).toLocaleString();
+    document.getElementById('lk-monthly').textContent = 'Rs.' + (monthProfit - monthExpense).toLocaleString();
     const tbody = document.getElementById('ledger-tbody');
     if (tbody) {
-      tbody.innerHTML = entries.map(e => `<tr>
+      const backendRows = entries.map(e => `<tr>
         <td style="font-size:11px">${e.date}</td>
         <td><span class="badge badge-green">sales</span></td>
         <td style="font-size:12px">Daily sales total</td>
         <td class="text-mono" style="font-weight:700;color:var(--green)">Rs.${Number(e.total_sales).toLocaleString()} | Profit Rs.${Number(e.total_profit).toLocaleString()}</td>
-      </tr>`).join('');
+      </tr>`);
+      const manualRows = manualEntries.map(e => `<tr>
+        <td style="font-size:11px">${e.date}</td>
+        <td><span class="badge ${e.type === 'expense' ? 'badge-red' : 'badge-green'}">${e.type}</span></td>
+        <td style="font-size:12px">${e.desc}</td>
+        <td class="text-mono" style="font-weight:700;color:${e.type === 'expense' ? 'var(--red)' : 'var(--green)'}">Rs.${Number(e.amount).toLocaleString()}</td>
+      </tr>`);
+      tbody.innerHTML = [...manualRows, ...backendRows].join('') || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text3)">No ledger entries found</td></tr>';
     }
   } catch (error) {
     showToast(error.message, 'error');
@@ -2713,22 +2788,71 @@ async function renderLedger() {
 }
 
 function addLedgerEntry(){
-  showToast('Manual Digi Khata entries are local-only in this build. Sales entries update automatically after checkout.', 'info');
+  const type = document.getElementById('lk-type')?.value || 'expense';
+  const desc = document.getElementById('lk-desc')?.value.trim();
+  const amount = Number(document.getElementById('lk-amount')?.value || 0);
+  if (!desc || amount <= 0) return showToast('Description and amount are required', 'error');
+  const entries = getLocalExpenses();
+  entries.unshift({ id: 'LED-' + Date.now(), type, desc, amount, date: todayKey() });
+  saveLocalExpenses(entries);
+  document.getElementById('lk-desc').value = '';
+  document.getElementById('lk-amount').value = '';
+  renderLedger();
+  showToast('Digi Khata entry added', 'success');
 }
 
-function renderReports(){
-  const rows = filteredSales();
+async function renderReports(){
+  if (authToken) await refreshSalesData().catch(() => {});
+  const rows = filteredSales('report');
   const revenue = rows.reduce((a,s)=>a + Number(s.total || 0),0);
   const profit = rows.reduce((a,s)=>a + Number(s.profit || 0),0);
   const cost = revenue - profit;
   const tbody = document.getElementById('report-tbody');
-  if(tbody) tbody.innerHTML = `<tr><td>Selected Period</td><td>${rows.length}</td><td>Rs.${revenue.toLocaleString()}</td><td>Rs.${cost.toLocaleString()}</td><td>Rs.${profit.toLocaleString()}</td><td>${revenue ? Math.round((profit/revenue)*100) : 0}%</td></tr>`;
+  const from = document.getElementById('report-date-from')?.value || 'Start';
+  const to = document.getElementById('report-date-to')?.value || 'Today';
+  if(tbody) tbody.innerHTML = `<tr><td>${from} to ${to}</td><td>${rows.length}</td><td>Rs.${revenue.toLocaleString()}</td><td>Rs.${cost.toLocaleString()}</td><td>Rs.${profit.toLocaleString()}</td><td>${revenue ? Math.round((profit/revenue)*100) : 0}%</td></tr>`;
+  renderReportCharts(rows);
+}
+
+function renderReportCharts(rows){
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const tc=isDark?'#94A3B8':'#475569';
+  const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
+  const monthKeys = Array.from({length:6}, (_,i) => {
+    const d = new Date();
+    d.setMonth(d.getMonth() - (5 - i));
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  });
+  const revenueData = monthKeys.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date).startsWith(k)).reduce((a,s)=>a+Number(s.total||0),0));
+  const profitData = monthKeys.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date).startsWith(k)).reduce((a,s)=>a+Number(s.profit||0),0));
+  const c1=document.getElementById('monthlyChart');
+  if(c1){if(monthlyChartInst)monthlyChartInst.destroy();monthlyChartInst=new Chart(c1,{type:'line',data:{labels:monthKeys.map(k=>k.slice(5)),datasets:[{label:'Revenue',data:revenueData,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:.4},{label:'Profit',data:profitData,borderColor:'#10B981',backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});}
+  const byPayment = rows.reduce((acc,s)=>{const key=String(s.payment||'cash').toUpperCase();acc[key]=(acc[key]||0)+Number(s.total||0);return acc;},{});
+  const labels = Object.keys(byPayment).length ? Object.keys(byPayment) : ['No Sales'];
+  const values = Object.keys(byPayment).length ? Object.values(byPayment) : [0];
+  const c2=document.getElementById('catChart');
+  if(c2){if(catChartInst)catChartInst.destroy();catChartInst=new Chart(c2,{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});}
 }
 
 function exportReportCsv(){
-  const rows = filteredSales();
+  const rows = filteredSales('report');
   downloadCsv('abiz-report.csv', [['Invoice','Date','Revenue','Profit'], ...rows.map(s => [s.invoice,s.date,s.total,s.profit])]);
   showToast('Report CSV downloaded', 'success');
+}
+
+function prepareSkuScan(){
+  const input = document.getElementById('prod-sku');
+  if (!input) return;
+  input.value = '';
+  input.focus();
+  showToast('Scan barcode now. USB scanner will type into SKU field.', 'info');
+}
+
+function handleSkuScanKey(event){
+  if (event.key !== 'Enter') return;
+  event.preventDefault();
+  const value = event.target.value.trim();
+  if (value) showToast('Barcode captured: ' + value, 'success');
 }
 
 function globalSearch(val){
@@ -2748,15 +2872,25 @@ function globalSearch(val){
 }
 
 function getReceiptSettings(){
-  return JSON.parse(localStorage.getItem('abiz_receipt_settings') || '{"title":"ABIZ Global Services","fontSize":"12","footer":"Thank you for your purchase!"}');
+  return JSON.parse(localStorage.getItem('abiz_receipt_settings') || '{"title":"ABIZ Global Services","fontSize":"12","footer":"Thank you for your purchase!","contact":"abizglobalservices.com"}');
 }
 
 function editReceiptSettings(){
   const settings = getReceiptSettings();
-  const title = prompt('Receipt title', settings.title) || settings.title;
-  const fontSize = prompt('Receipt font size', settings.fontSize) || settings.fontSize;
-  const footer = prompt('Receipt footer text', settings.footer) || settings.footer;
-  localStorage.setItem('abiz_receipt_settings', JSON.stringify({ title, fontSize, footer }));
+  document.getElementById('receipt-title').value = settings.title || 'ABIZ Global Services';
+  document.getElementById('receipt-font-size').value = settings.fontSize || '12';
+  document.getElementById('receipt-footer').value = settings.footer || 'Thank you for your purchase!';
+  document.getElementById('receipt-contact').value = settings.contact || 'abizglobalservices.com';
+  openModal('modal-receipt-settings');
+}
+
+function saveReceiptSettings(){
+  const title = document.getElementById('receipt-title').value.trim() || 'ABIZ Global Services';
+  const fontSize = document.getElementById('receipt-font-size').value || '12';
+  const footer = document.getElementById('receipt-footer').value.trim() || 'Thank you for your purchase!';
+  const contact = document.getElementById('receipt-contact').value.trim() || 'abizglobalservices.com';
+  localStorage.setItem('abiz_receipt_settings', JSON.stringify({ title, fontSize, footer, contact }));
+  closeModal('modal-receipt-settings');
   showToast('Receipt settings saved', 'success');
 }
 
@@ -2778,7 +2912,7 @@ function showReceipt(sale){
         ${sale.discount?`<div class="rt-row"><span>Discount</span><span style="color:#EF4444">- Rs. ${Number(sale.discount).toLocaleString()}</span></div>`:''}
         <div class="rt-row grand"><span>TOTAL</span><span>Rs. ${Number(sale.total || 0).toLocaleString()}</span></div>
       </div>
-      <div class="receipt-footer">${settings.footer}<br><b>abizglobalservices.com</b></div>
+      <div class="receipt-footer">${settings.footer}<br><b>${settings.contact || 'abizglobalservices.com'}</b></div>
     </div>`;
   openModal('modal-receipt');
 }
