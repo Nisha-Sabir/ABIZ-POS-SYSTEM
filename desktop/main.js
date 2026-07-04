@@ -28,23 +28,31 @@ app.on('window-all-closed', () => {
 });
 
 ipcMain.handle('api:request', async (_event, request) => {
-  const response = await fetch(request.url, {
-    method: request.method || 'GET',
-    headers: request.headers || {},
-    body: request.body || undefined
-  });
-  const text = await response.text();
-  let data = null;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = text;
+  try {
+    const response = await fetch(request.url, {
+      method: request.method || 'GET',
+      headers: request.headers || {},
+      body: request.body || undefined
+    });
+    const text = await response.text();
+    let data = null;
+    if (text) {
+      try {
+        data = JSON.parse(text);
+      } catch {
+        data = text;
+      }
     }
+    return {
+      ok: response.ok,
+      status: response.status,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      status: 0,
+      data: { detail: 'Network error or server unreachable.' }
+    };
   }
-  return {
-    ok: response.ok,
-    status: response.status,
-    data
-  };
 });
