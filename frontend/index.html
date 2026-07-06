@@ -2099,7 +2099,9 @@ function renderClients(){
     <td style="font-size:11px">${c.expiry}</td>
     <td><span class="badge ${c.active?'badge-green':'badge-red'}">${c.active?'Active':'Suspended'}</span></td>
     <td><div class="flex gap-2">
+      <button class="btn btn-outline btn-xs" onclick="alert('Key: ${c.key}')">Key</button>
       <button class="btn btn-${c.active?'danger':'success'} btn-xs" onclick="toggleClient('${c.id}')">${c.active?'Suspend':'Activate'}</button>
+      <button class="btn btn-danger btn-xs" onclick="deleteClient('${c.id}')">Delete</button>
     </div></td>
   </tr>`).join('');
 }
@@ -3796,24 +3798,6 @@ function renderSuperAdmin() {
   `).join('');
 }
 
-function renderClients() {
-  // If there's a client table, render it here (fallback if they are using a table view instead of grid)
-  const tbody = document.getElementById('clients-tbody');
-  if (!tbody) return;
-  tbody.innerHTML = DB.clients.map(c => `
-    <tr>
-      <td>${c.biz}</td>
-      <td>${c.email}</td>
-      <td><span class="text-mono">${c.key}</span></td>
-      <td><span class="badge ${c.active ? 'badge-green' : 'badge-red'}">${c.active ? 'Active' : 'Suspended'}</span></td>
-      <td>
-        <button class="btn btn-outline btn-xs" onclick="alert('Key: ${c.key}')">View Key</button>
-        <button class="btn btn-danger btn-xs" onclick="deleteClient('${c.id}')">Delete</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
 function deleteClient(id) {
   if (!confirm('Are you sure you want to delete this client?')) return;
   DB.clients = DB.clients.filter(c => c.id !== id);
@@ -3821,10 +3805,6 @@ function deleteClient(id) {
   renderSuperAdmin();
   renderClients();
   showToast('Client deleted', 'success');
-}
-
-function renderLicenses() {
-  // empty for now, assuming licenses are managed via backend if needed
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
