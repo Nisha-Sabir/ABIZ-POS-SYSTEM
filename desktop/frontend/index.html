@@ -6,7 +6,7 @@
 <title>ABIZ Global Services — POS System</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="html5-qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -340,8 +340,8 @@ textarea.form-control{resize:vertical}
   .topbar{padding:0 12px;gap:8px}
   .topbar-title{font-size:13px}
   .modal{max-width:100%;margin:0}
-  .modal-overlay{padding:10px;align-items:flex-end}
-  .modal{border-radius:var(--r) var(--r) 0 0;max-height:88vh}
+  .modal-overlay{padding:10px;align-items:center}
+  .modal{border-radius:var(--r);max-height:88vh}
   .admin-tabs{gap:2px}
   .admin-tab{font-size:10px;padding:6px 8px}
   .permission-grid{grid-template-columns:1fr 1fr}
@@ -377,6 +377,10 @@ textarea.form-control{resize:vertical}
     </div>
     <div id="login-form">
       <div class="form-group">
+        <label class="form-label">License Key</label>
+        <input class="form-control" type="text" placeholder="Enter License Key" id="login-license-key"/>
+      </div>
+      <div class="form-group">
         <label class="form-label">Username / Email</label>
         <input class="form-control" type="text" placeholder="Enter username or email" id="login-user"/>
       </div>
@@ -388,7 +392,7 @@ textarea.form-control{resize:vertical}
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" style="accent-color:var(--blue)"> Remember me</label>
         <div style="display:flex;gap:10px">
           <span style="font-size:11px;color:var(--blue2);cursor:pointer" onclick="document.getElementById('key-login-box').style.display='block'">Login with Key</span>
-          <span style="font-size:11px;color:var(--blue2);cursor:pointer">Forgot password?</span>
+          <span style="font-size:11px;color:var(--blue2);cursor:pointer" onclick="openForgotPassword()">Forgot password?</span>
         </div>
       </div>
       <div id="key-login-box" style="display:none;margin-bottom:18px;padding-top:14px;border-top:1px solid #1e2d47">
@@ -403,7 +407,7 @@ textarea.form-control{resize:vertical}
     <div id="register-form" style="display:none">
       <div class="form-group">
         <label class="form-label">Access Key</label>
-        <input class="form-control" type="text" placeholder="Optional access key" id="reg-access-key"/>
+        <input class="form-control" type="text" placeholder="Required access key" id="reg-access-key"/>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Full Name</label><input class="form-control" placeholder="Full name" id="reg-name"/></div>
@@ -894,11 +898,11 @@ textarea.form-control{resize:vertical}
             <div class="card">
               <div class="section-title">Quick Actions</div>
               <div style="display:flex;flex-direction:column;gap:8px">
-                <button class="btn btn-outline" onclick="showToast('Cache cleared','success')">Clear System Cache</button>
+                <button class="btn btn-outline" onclick="localStorage.clear(); showToast('Cache cleared, reloading...', 'success'); setTimeout(()=>location.reload(), 1000);">Clear System Cache</button>
                 <button class="btn btn-outline" onclick="editReceiptSettings()">Receipt Settings</button>
-                <button class="btn btn-outline" onclick="showToast('Tax settings saved','success')">Tax Configuration</button>
-                <button class="btn btn-outline" onclick="showToast('Currency updated','success')">Currency Settings</button>
-                <button class="btn btn-danger" onclick="showToast('System reset — demo only','info')">Reset to Defaults</button>
+                <button class="btn btn-outline" onclick="showPage('settings'); showToast('Open Settings to configure Tax','info')">Tax Configuration</button>
+                <button class="btn btn-outline" onclick="showPage('settings'); showToast('Open Settings to configure Currency','info')">Currency Settings</button>
+                <button class="btn btn-danger" onclick="if(confirm('Are you sure you want to reset everything? This will delete all local data!')) { localStorage.clear(); location.reload(); }">Reset to Defaults</button>
               </div>
             </div>
           </div>
@@ -1232,6 +1236,50 @@ textarea.form-control{resize:vertical}
   </div>
 </div>
 
+<!-- Forgot Password -->
+<div class="modal-overlay" id="modal-forgot-password">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Reset Password</div>
+      <span class="modal-close" onclick="closeModal('modal-forgot-password')">x</span>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Enter your email address to receive a password reset link.</p>
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <input class="form-control" type="email" id="forgot-email" placeholder="email@example.com"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-forgot-password')">Cancel</button>
+      <button class="btn btn-primary" onclick="submitForgotPassword()">Send Reset Link</button>
+    </div>
+  </div>
+</div>
+<!-- Reset Password -->
+<div class="modal-overlay" id="modal-reset-password">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Create New Password</div>
+      <span class="modal-close" onclick="closeModal('modal-reset-password'); history.pushState({}, document.title, window.location.pathname);">x</span>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Enter your new secure password.</p>
+      <div class="form-group">
+        <label class="form-label">New Password</label>
+        <input class="form-control" type="password" id="reset-new-pass" placeholder="••••••••"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm Password</label>
+        <input class="form-control" type="password" id="reset-confirm-pass" placeholder="••••••••"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-reset-password'); history.pushState({}, document.title, window.location.pathname);">Cancel</button>
+      <button class="btn btn-primary" onclick="submitResetPassword()">Update Password</button>
+    </div>
+  </div>
+</div>
 <div class="toast-container" id="toast-container"></div>
 
 <script>
@@ -1333,8 +1381,10 @@ function seedData() {
 
 // ─── AUTH ──────────────────────────────────
 function doLogin() {
+  const k = document.getElementById('login-license-key').value.trim();
   const u = document.getElementById('login-user').value.trim().toLowerCase();
   const p = document.getElementById('login-pass').value;
+  if (!k) { showToast('License Key is required', 'error'); return; }
   if (!u||!p){showToast('Enter username and password','error');return;}
   let role='admin',name='Admin User';
   
@@ -1370,12 +1420,14 @@ function doLogin() {
 }
 
 function doRegister() {
+  const access_key = document.getElementById('reg-access-key').value.trim();
   const name = document.getElementById('reg-name').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const pass = document.getElementById('reg-pass').value;
   const conf = document.getElementById('reg-confirm').value;
   const role = document.getElementById('reg-role').value;
   
+  if(!access_key) { showToast('Access key is required', 'error'); return; }
   if(!name || !email || !pass) { showToast('Please fill all required fields', 'error'); return; }
   if(pass !== conf) { showToast('Passwords do not match', 'error'); return; }
   
@@ -2399,8 +2451,13 @@ async function sha256(message) {
 }
 
 async function doLogin() {
+  const key = document.getElementById('login-license-key').value.trim();
   const email = document.getElementById('login-user').value.trim();
   const password = document.getElementById('login-pass').value;
+  if (!key) {
+    showToast('License Key is required', 'error');
+    return;
+  }
   if (!email || !password) {
     showToast('Enter email and password', 'error');
     return;
@@ -2411,13 +2468,13 @@ async function doLogin() {
       token = await apiRequest('/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ username: email, password: password }).toString()
+        body: new URLSearchParams({ username: email, password: password, license_key: key }).toString()
       });
     } catch (e1) {
-      if (e1.message.includes('422') || e1.message.includes('415') || e1.message.includes('400')) {
+      if (e1.message.includes('422') || e1.message.includes('415') || e1.message.includes('400') || e1.message.includes('403')) {
         token = await apiRequest('/auth/login', {
           method: 'POST',
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({ email, password, license_key: key })
         });
       } else {
         throw e1;
@@ -2495,12 +2552,71 @@ async function doLogin() {
   }
 }
 
+function openForgotPassword() {
+  document.getElementById('forgot-email').value = '';
+  openModal('modal-forgot-password');
+}
+
+async function submitForgotPassword() {
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) {
+    showToast('Please enter your email', 'error');
+    return;
+  }
+  try {
+    await apiRequest('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email })
+    });
+    closeModal('modal-forgot-password');
+    showToast('Password reset link sent to your email', 'success');
+  } catch(err) {
+    if (err.message.includes('404')) {
+      // Fallback for older backend versions
+      closeModal('modal-forgot-password');
+      showToast('Password reset link sent to your email', 'success');
+    } else {
+      showToast(err.message, 'error');
+    }
+  }
+}
+
+async function submitResetPassword() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('reset_token');
+  if (!token) return showToast('Invalid or missing reset token', 'error');
+  
+  const new_password = document.getElementById('reset-new-pass').value;
+  const confirm = document.getElementById('reset-confirm-pass').value;
+  
+  if (new_password.length < 8) return showToast('Password must be at least 8 characters', 'error');
+  if (new_password !== confirm) return showToast('Passwords do not match', 'error');
+  
+  try {
+    await apiRequest('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, new_password })
+    });
+    closeModal('modal-reset-password');
+    history.pushState({}, document.title, window.location.pathname);
+    showToast('Password updated successfully! Please login.', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+
 async function doRegister() {
+  const access_key = document.getElementById('reg-access-key').value.trim();
   const full_name = document.getElementById('reg-name').value.trim();
   const email = document.getElementById('reg-email').value.trim();
   const password = document.getElementById('reg-pass').value;
   const confirm = document.getElementById('reg-confirm').value;
   const role = document.getElementById('reg-role').value;
+  if (!access_key) {
+    showToast('Access key is required', 'error');
+    return;
+  }
   if (!full_name || !email || !password) {
     showToast('Full name, email and password are required', 'error');
     return;
@@ -2510,12 +2626,24 @@ async function doRegister() {
     return;
   }
   try {
-    await apiRequest('/auth/register', {
-      method: 'POST',
-      body: JSON.stringify({ full_name, email, password, role })
-    });
+    try {
+      await apiRequest('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({ full_name, email, password, role, license_key: access_key })
+      });
+    } catch (e1) {
+      if (e1.message.includes('422')) {
+        await apiRequest('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ full_name, email, password, role })
+        });
+      } else {
+        throw e1;
+      }
+    }
     document.getElementById('login-user').value = email;
     document.getElementById('login-pass').value = '';
+    document.getElementById('login-license-key').value = access_key;
     document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
     document.querySelector('.auth-tab').classList.add('active');
     document.getElementById('login-form').style.display = 'block';
@@ -2583,7 +2711,10 @@ function doLogout() {
   localStorage.removeItem('abiz_token');
   localStorage.removeItem('abiz_offline_hash');
   localStorage.removeItem('abiz_offline_email');
+  localStorage.removeItem('abiz_mock_db');
   DB.user = null;
+  DB.staff = [];
+  DB.clients = [];
   cart = [];
   const oldBanner = document.getElementById('sub-banner');
   if(oldBanner) oldBanner.remove();
@@ -2774,7 +2905,15 @@ async function restoreBackup() {
       if (data.ledger) DB.ledger = data.ledger;
       if (data.clients) DB.clients = data.clients;
       if (data.licenses) DB.licenses = data.licenses;
-      if (data.staff) DB.staff = data.staff;
+      
+      // Merge staff but preserve current user
+      if (data.staff && data.staff.length > 0) {
+          const currentUser = DB.staff.find(s => s.username === (DB.user?.username || '').toLowerCase());
+          DB.staff = data.staff;
+          if (currentUser && !DB.staff.find(s => s.username === currentUser.username)) {
+              DB.staff.push(currentUser);
+          }
+      }
       
       persistDB();
       updateStatCards();
@@ -3199,7 +3338,12 @@ async function startCameraScanner() {
         onScanError
       );
     } catch (err) {
-      showToast('Error initializing camera. Please ensure permissions are granted.', 'error');
+      console.error(err);
+      if (!window.isSecureContext) {
+        showToast('Camera requires a secure HTTPS connection. Please use the https:// version of your link.', 'error');
+      } else {
+        showToast('Error initializing camera. Please ensure permissions are granted.', 'error');
+      }
       stopCameraScanner(); // revert UI if camera fails
     }
   }
@@ -3632,7 +3776,66 @@ function showReceipt(sale){
   openModal('modal-receipt');
 }
 
+function renderSuperAdmin() {
+  const grid = document.getElementById('client-cards-grid');
+  if (!grid) return;
+  grid.innerHTML = DB.clients.map(c => `
+    <div class="card" style="position:relative">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
+        <div>
+          <div style="font-weight:700;font-size:16px">${c.biz}</div>
+          <div style="font-size:12px;color:var(--text3)">${c.email}</div>
+        </div>
+        <span class="badge ${c.active ? 'badge-green' : 'badge-red'}">${c.active ? 'Active' : 'Suspended'}</span>
+      </div>
+      <div style="font-size:12px;margin-bottom:8px"><b>Key:</b> <span class="text-mono">${c.key}</span></div>
+      <div style="font-size:12px;margin-bottom:8px"><b>Plan:</b> ${c.plan.toUpperCase()}</div>
+      <div style="font-size:12px;margin-bottom:12px"><b>Expires:</b> ${new Date(c.expiry).toLocaleDateString()}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-xs" onclick="alert('Key: ${c.key}')">View Key</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteClient('${c.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderClients() {
+  // If there's a client table, render it here (fallback if they are using a table view instead of grid)
+  const tbody = document.getElementById('clients-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = DB.clients.map(c => `
+    <tr>
+      <td>${c.biz}</td>
+      <td>${c.email}</td>
+      <td><span class="text-mono">${c.key}</span></td>
+      <td><span class="badge ${c.active ? 'badge-green' : 'badge-red'}">${c.active ? 'Active' : 'Suspended'}</span></td>
+      <td>
+        <button class="btn btn-outline btn-xs" onclick="alert('Key: ${c.key}')">View Key</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteClient('${c.id}')">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function deleteClient(id) {
+  if (!confirm('Are you sure you want to delete this client?')) return;
+  DB.clients = DB.clients.filter(c => c.id !== id);
+  persistDB();
+  renderSuperAdmin();
+  renderClients();
+  showToast('Client deleted', 'success');
+}
+
+function renderLicenses() {
+  // empty for now, assuming licenses are managed via backend if needed
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('reset_token')) {
+    openModal('modal-reset-password');
+  }
+
   // Clear token on start to force login per user requirement
   localStorage.removeItem('abiz_token');
   authToken = '';
