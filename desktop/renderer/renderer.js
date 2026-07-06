@@ -3,7 +3,6 @@ const state = {
   products: []
 };
 
-const DEFAULT_BACKEND_URL = 'https://abiz-pos-system-production-02e4.up.railway.app/api/v1';
 const $ = (id) => document.getElementById(id);
 
 const localDb = (() => {
@@ -98,20 +97,21 @@ async function setStatus(message, ok = true) {
 }
 
 async function isLoggedIn() {
-  return Boolean(
-    (await localDb.getSetting('auth_token')) || 
-    localStorage.getItem('abiz_token') || 
-    (await localDb.getSetting('offline_session_active'))
-  );
+  return Boolean(sessionStorage.getItem('pos_session_active'));
 }
 
 async function updateAuthState() {
   const loggedIn = await isLoggedIn();
   $('terminal-area')?.classList.toggle('locked', !loggedIn);
   if ($('do-login')) $('do-login').style.display = loggedIn ? 'none' : 'inline-flex';
+  if ($('logout-btn')) $('logout-btn').style.display = loggedIn ? 'inline-flex' : 'none';
+  if ($('backend-url')) $('backend-url').style.display = loggedIn ? 'none' : 'block';
   if ($('login-email')) $('login-email').style.display = loggedIn ? 'none' : 'block';
   if ($('login-password')) $('login-password').style.display = loggedIn ? 'none' : 'block';
-  if ($('logout-btn')) $('logout-btn').style.display = loggedIn ? 'inline-flex' : 'none';
+  if ($('login-panel')) {
+    const labels = $('login-panel').querySelectorAll('label');
+    labels.forEach(l => l.style.display = loggedIn ? 'none' : 'block');
+  }
   if ($('scanner-input') && loggedIn) $('scanner-input').focus();
   return loggedIn;
 }
@@ -160,8 +160,8 @@ async function getBackendConfig() {
   const sharedUrl = localStorage.getItem('abiz_api_base') || '';
   if (!savedUrl && sharedUrl) await localDb.setSetting('backend_url', sharedUrl);
   return {
-    baseUrl: savedUrl || sharedUrl || DEFAULT_BACKEND_URL,
-    token: await localDb.getSetting('auth_token')
+    baseUrl: savedUrl || sharedUrl,
+    token: (await localDb.getSetting('auth_token')) || localStorage.getItem('abiz_token')
   };
 }
 
@@ -170,59 +170,72 @@ async function api(path, options = {}) {
   if (!baseUrl) throw new Error('Backend URL missing in Settings.');
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const request = {
-    url: baseUrl.replace(/\/$/, '') + path,
-    method: options.method || 'GET',
-    headers,
-    body: options.body || undefined
-  };
-  if (window.abizDesktop?.apiRequest) {
-    const response = await window.abizDesktop.apiRequest(request);
-    if (!response.ok) {
-      throw new Error(response.data?.detail || response.data || 'Server request failed.');
-    }
-    return response.data;
-  }
-  const response = await fetch(request.url, { ...options, headers });
+  const response = await fetch(baseUrl.replace(/\/$/, '') + path, { ...options, headers });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || 'Server request failed.');
+    let errMsg = data.detail || data.message || 'Server request failed.';
+    if (typeof errMsg !== 'string') errMsg = JSON.stringify(errMsg);
+    throw new Error(`[${response.status}] ${errMsg}`);
   }
   return response.status === 204 ? null : response.json();
 }
 
 async function sha256(message) {
-  const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  if (window.crypto && crypto.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch(e) {}
+  }
+  let hash = 0;
+  for (let i = 0; i < message.length; i++) {
+    hash = ((hash << 5) - hash) + message.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return 'fb_' + Math.abs(hash).toString(16);
 }
 
 async function login() {
-  const backendUrl = $('backend-url').value.trim();
   const email = $('login-email').value.trim();
   const password = $('login-password').value;
+  if (!email || !password) throw new Error('Email and password required.');
+
+  const backendUrl = $('backend-url').value.trim();
   if (backendUrl) {
     await localDb.setSetting('backend_url', backendUrl);
     localStorage.setItem('abiz_api_base', backendUrl);
   }
-  if (!email || !password) throw new Error('Email and password required.');
 
   try {
-    const token = await api('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    await localDb.setSetting('auth_token', token.access_token);
-    await localDb.setSetting('offline_session_active', '');
+    let token;
+    try {
+      token = await api('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: email, password: password }).toString()
+      });
+    } catch (e1) {
+      if (e1.message.includes('422') || e1.message.includes('415') || e1.message.includes('400')) {
+        token = await api('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+      } else {
+        throw e1;
+      }
+    }
+    await localDb.setSetting('auth_token', token.access_token || token.token || (typeof token === 'string' ? token : ''));
+    sessionStorage.setItem('pos_session_active', 'true');
     await localDb.setSetting('login_email', email);
-    await localDb.setSetting('login_password', '');
     await localDb.setSetting('last_login_at', new Date().toISOString());
-    $('login-password').value = '';
     
     const hash = await sha256(password);
     localStorage.setItem('abiz_offline_hash', hash);
     localStorage.setItem('abiz_offline_email', email);
+    await localDb.setSetting('abiz_offline_hash', hash);
+    await localDb.setSetting('abiz_offline_email', email);
 
     await syncProducts();
     await updateAuthState();
@@ -238,13 +251,24 @@ async function login() {
       await localDb.putProducts(dummyProducts);
       await refreshProducts();
       await updateAuthState();
-      $('login-password').value = '';
       await setStatus('Offline Mode: Logged in via emergency testing bypass. Dummy products loaded.');
       return;
     }
     
-    const offlineHash = localStorage.getItem('abiz_offline_hash');
-    const offlineEmail = localStorage.getItem('abiz_offline_email');
+    try {
+      const staffDb = JSON.parse(localStorage.getItem('abiz_mock_db')) || {};
+      const localStaff = (staffDb.staff || []).find(s => (s.username || '').toLowerCase() === email.toLowerCase() && s.password === password && s.status === 'active');
+      if (localStaff) {
+        await localDb.setSetting('login_email', email);
+        sessionStorage.setItem('pos_session_active', 'true');
+        await updateAuthState();
+        await setStatus('Offline Mode: Logged in locally as ' + localStaff.name);
+        return;
+      }
+    } catch(e) {}
+
+    let offlineHash = localStorage.getItem('abiz_offline_hash') || await localDb.getSetting('abiz_offline_hash');
+    let offlineEmail = localStorage.getItem('abiz_offline_email') || await localDb.getSetting('abiz_offline_email');
     if (!offlineHash) {
       throw new Error('Offline login unavailable: You must log in online at least once to enable secure offline access.');
     }
@@ -254,9 +278,8 @@ async function login() {
     const enteredHash = await sha256(password);
     if (enteredHash === offlineHash) {
       await localDb.setSetting('login_email', email);
-      await localDb.setSetting('offline_session_active', 'true');
+      sessionStorage.setItem('pos_session_active', 'true');
       await updateAuthState();
-      $('login-password').value = '';
       await setStatus('Offline Mode: Server unreachable, logged in using local secure hash.');
       return;
     } else {
@@ -267,7 +290,8 @@ async function login() {
 
 async function logout() {
   await localDb.setSetting('auth_token', '');
-  await localDb.setSetting('offline_session_active', '');
+  sessionStorage.removeItem('pos_session_active');
+  localStorage.removeItem('abiz_token');
   state.cart = [];
   renderCart();
   await updateAuthState();
@@ -275,7 +299,7 @@ async function logout() {
 }
 
 async function scanProduct(code) {
-  const product = state.products.find((item) => item.qr_code === code);
+  const product = state.products.find((item) => item.qr_code === code || item.id === code || String(item.id) === code);
   if (!product) {
     $('product-result').textContent = 'Product not found in local database.';
     await setStatus('Product not found. Sync products first.', false);
@@ -322,42 +346,83 @@ async function tryAutoSync() {
   }
   try {
     await syncSales();
+    if (await isLoggedIn()) {
+      await syncProducts();
+    }
   } catch {
     await setStatus('Auto sync will retry.', false);
   }
 }
 
-function printInvoice(sale) {
-  let iframe = document.getElementById('print-iframe');
-  if (!iframe) {
-    iframe = document.createElement('iframe');
-    iframe.id = 'print-iframe';
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
+function printInvoice(sale, cartItems) {
+  let modalOverlay = document.getElementById('offline-receipt-modal');
+  if (!modalOverlay) {
+    modalOverlay = document.createElement('div');
+    modalOverlay.id = 'offline-receipt-modal';
+    document.body.appendChild(modalOverlay);
+    
+    const style = document.createElement('style');
+    style.innerHTML = `
+      #offline-receipt-modal { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 10000; display: flex; align-items: center; justify-content: center; }
+      .offline-receipt-box { background: white; padding: 20px; border-radius: 8px; width: 100%; max-width: 320px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
+      .offline-receipt-actions { display: flex; gap: 10px; margin-top: 15px; }
+      .offline-receipt-actions button { flex: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+      .btn-print { background: #2563EB; color: white; }
+      .btn-close { background: #f1f5f9; color: #333; }
+      
+      @media print {
+        body * { display: none !important; }
+        #offline-receipt-modal, #offline-receipt-modal * { display: block !important; }
+        #offline-receipt-modal { position: absolute; left: 0; top: 0; margin: 0; padding: 0; background: white !important; align-items: flex-start; justify-content: flex-start; }
+        .offline-receipt-box { box-shadow: none !important; max-width: 100%; }
+        .offline-receipt-actions { display: none !important; }
+        @page { margin: 0; }
+      }
+    `;
+    document.head.appendChild(style);
   }
-  const content = `
-    <html><head><title>Invoice</title><style>
-      body{font-family:Arial,sans-serif;padding:16px}
-      h1{font-size:18px;margin:0 0 8px}
-      table{width:100%;border-collapse:collapse;margin-top:12px}
-      td,th{border-bottom:1px solid #ddd;padding:6px;text-align:left}
-      .total{font-size:18px;font-weight:bold;text-align:right;margin-top:16px}
-    </style></head><body>
-      <h1>ABIZ Global Services</h1>
-      <div>Invoice: ${sale.client_sale_id}</div>
-      <div>Date: ${new Date(sale.created_at).toLocaleString()}</div>
-      <table><thead><tr><th>Item</th><th>Qty</th><th>Price</th></tr></thead><tbody>
-      ${state.cart.map((item) => `<tr><td>${item.name}</td><td>${item.quantity}</td><td>${money(item.sale_price)}</td></tr>`).join('')}
-      </tbody></table>
-      <div class="total">Total: ${$('total').textContent}</div>
-      <script>
-        setTimeout(() => window.print(), 100);
-      <\/script>
-    </body></html>
+  
+  modalOverlay.style.display = 'flex';
+  
+  modalOverlay.innerHTML = `
+    <div class="offline-receipt-box">
+      <div id="print-section">
+        <div style="font-family:'Courier New', monospace;font-size:12px;color:black;">
+          <h1 style="font-size:16px;margin:0 0 10px;text-align:center;font-weight:bold;">ABIZ Global Services</h1>
+          <div style="margin-bottom:4px"><b>Inv:</b> ${sale.client_sale_id}</div>
+          <div style="margin-bottom:12px"><b>Date:</b> ${new Date(sale.created_at).toLocaleString()}</div>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;font-size:12px">
+            <thead>
+              <tr>
+                <th style="border-bottom:1px solid #000;padding:4px 0;text-align:left">Item</th>
+                <th style="border-bottom:1px solid #000;padding:4px 0;text-align:center">Qty</th>
+                <th style="border-bottom:1px solid #000;padding:4px 0;text-align:right">Price</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${cartItems.map((item) => `<tr>
+                <td style="border-bottom:1px dashed #ccc;padding:6px 0">${item.name}</td>
+                <td style="border-bottom:1px dashed #ccc;padding:6px 0;text-align:center">${item.quantity}</td>
+                <td style="border-bottom:1px dashed #ccc;padding:6px 0;text-align:right">${money(item.sale_price)}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+          <div style="font-size:14px;font-weight:bold;text-align:right;margin-top:16px;border-top:1px solid #000;padding-top:8px">
+            Total: ${money(Math.max(0, cartItems.reduce((sum, i) => sum + i.sale_price * i.quantity, 0) - sale.discount))}
+          </div>
+          <div style="text-align:center;margin-top:20px;font-size:10px">Thank you for your business!<br><b>abizglobalservices.com</b></div>
+        </div>
+      </div>
+      <div class="offline-receipt-actions">
+        <button class="btn-close" onclick="document.getElementById('offline-receipt-modal').style.display='none'">Close</button>
+        <button class="btn-print" onclick="window.print()">Print</button>
+      </div>
+    </div>
   `;
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(content);
-  iframe.contentDocument.close();
+  
+  setTimeout(() => {
+    window.print();
+  }, 500);
 }
 
 async function checkout() {
@@ -382,11 +447,7 @@ async function checkout() {
     }))
   };
   await localDb.addPendingSale(sale);
-  try {
-    printInvoice(sale);
-  } catch (err) {
-    console.error('Printing invoice failed:', err);
-  }
+  printInvoice(sale, [...state.cart]);
   state.cart = [];
   renderCart();
   await setStatus('Sale saved locally. Auto sync will run when internet is available.');
@@ -394,19 +455,33 @@ async function checkout() {
 }
 
 async function loadSettings() {
-  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || DEFAULT_BACKEND_URL;
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || DEFAULT_BACKEND_URL;
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
   $('login-email').value = await localDb.getSetting('login_email');
-  $('login-password').value = '';
-  await localDb.setSetting('login_password', '');
   $('scanner-input').addEventListener('keydown', async (event) => {
     if (event.key !== 'Enter') return;
     const code = event.target.value.trim();
     event.target.value = '';
     if (code) await scanProduct(code);
+  });
+  
+  let barcodeBuffer = '';
+  let barcodeTimeout = null;
+  document.addEventListener('keydown', async (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'Enter' && barcodeBuffer.length > 2) {
+      await scanProduct(barcodeBuffer);
+      barcodeBuffer = '';
+      return;
+    }
+    if (e.key.length === 1) {
+      barcodeBuffer += e.key;
+      clearTimeout(barcodeTimeout);
+      barcodeTimeout = setTimeout(() => barcodeBuffer = '', 100);
+    }
   });
   $('sync-products').addEventListener('click', () => syncProducts().catch((error) => setStatus(error.message, false)));
   $('sync-sales').addEventListener('click', () => syncSales().catch((error) => setStatus(error.message, false)));
@@ -424,14 +499,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('login-btn')?.addEventListener('click', async () => {
     $('login-email').value = await localDb.getSetting('login_email');
-    $('login-password').value = '';
     $('login-password').focus();
   });
   $('save-settings')?.addEventListener('click', async () => {
     await localDb.setSetting('backend_url', $('backend-url').value.trim());
     await setStatus('Settings saved.');
   });
-  $('do-login')?.addEventListener('click', () => login().catch((error) => setStatus(error.message, false)));
+  $('do-login').addEventListener('click', () => login().catch((error) => setStatus(error.message, false)));
   $('login-password')?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') login().catch((error) => setStatus(error.message, false));
   });
@@ -443,8 +517,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderCart();
   const loggedIn = await updateAuthState();
   if (!loggedIn && navigator.onLine && $('backend-url').value && $('login-email').value) {
-    setStatus('Enter password and click Login & Sync. Password is not saved for security.', false);
-  } else {
-    await setStatus('Desktop app ready.');
+    setStatus('Login required to refresh access.', false);
   }
+  await setStatus('Desktop app ready.');
 });

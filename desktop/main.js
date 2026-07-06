@@ -1,10 +1,14 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
-app.disableHardwareAcceleration();
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-software-rasterizer');
-app.commandLine.appendSwitch('no-sandbox');
+app.setPath('userData', path.join(__dirname, 'electron-local-data'));
+app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
+app.commandLine.appendSwitch('disk-cache-size', '1');
+
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -21,38 +25,20 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
-app.whenReady().then(createWindow);
+app.disableHardwareAcceleration();
 
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
+if (gotTheLock) {
+  app.whenReady().then(createWindow);
 
-ipcMain.handle('api:request', async (_event, request) => {
-  try {
-    const response = await fetch(request.url, {
-      method: request.method || 'GET',
-      headers: request.headers || {},
-      body: request.body || undefined
-    });
-    const text = await response.text();
-    let data = null;
-    if (text) {
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = text;
-      }
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    const wins = BrowserWindow.getAllWindows();
+    if (wins.length) {
+      if (wins[0].isMinimized()) wins[0].restore();
+      wins[0].focus();
     }
-    return {
-      ok: response.ok,
-      status: response.status,
-      data
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      status: 0,
-      data: { detail: 'Network error or server unreachable.' }
-    };
-  }
-});
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') app.quit();
+  });
+}

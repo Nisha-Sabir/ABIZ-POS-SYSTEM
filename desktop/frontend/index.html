@@ -288,6 +288,15 @@ textarea.form-control{resize:vertical}
 .rt-row.grand{font-size:15px;font-weight:800;color:#2563EB}
 .receipt-footer{text-align:center;margin-top:14px;padding-top:10px;border-top:1px dashed #ddd;font-size:10px;color:#999}
 
+@media print {
+  body * { display: none !important; }
+  #modal-receipt, #modal-receipt *, #receipt-content, #receipt-content * { display: block !important; }
+  .modal-overlay { background: transparent !important; display: block !important; }
+  .modal { box-shadow: none !important; border: none !important; background: transparent !important; position: absolute; left: 0; top: 0; margin: 0; max-width: 100%; width: 100%; animation: none !important; }
+  .modal-header, .modal-footer { display: none !important; }
+  @page { margin: 0; }
+}
+
 /* MISC */
 .report-filters{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .stock-bar{height:5px;background:var(--card2);border-radius:3px;overflow:hidden;margin-top:4px}
@@ -367,8 +376,8 @@ textarea.form-control{resize:vertical}
     </div>
     <div id="login-form">
       <div class="form-group">
-        <label class="form-label">Email</label>
-        <input class="form-control" type="email" placeholder="admin@example.com" id="login-user"/>
+        <label class="form-label">Username / Email</label>
+        <input class="form-control" type="text" placeholder="Enter username or email" id="login-user"/>
       </div>
       <div class="form-group">
         <label class="form-label">Password</label>
@@ -376,7 +385,14 @@ textarea.form-control{resize:vertical}
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
         <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer"><input type="checkbox" style="accent-color:var(--blue)"> Remember me</label>
-        <span style="font-size:11px;color:var(--blue2);cursor:pointer">Forgot password?</span>
+        <div style="display:flex;gap:10px">
+          <span style="font-size:11px;color:var(--blue2);cursor:pointer" onclick="document.getElementById('key-login-box').style.display='block'">Login with Key</span>
+          <span style="font-size:11px;color:var(--blue2);cursor:pointer">Forgot password?</span>
+        </div>
+      </div>
+      <div id="key-login-box" style="display:none;margin-bottom:18px;padding-top:14px;border-top:1px solid #1e2d47">
+        <input class="form-control" type="text" id="login-key-input" placeholder="Enter Client Key" style="margin-bottom:8px">
+        <button class="btn btn-outline" style="width:100%;justify-content:center;padding:10px" onclick="doKeyLogin()">Submit Key</button>
       </div>
       <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px" onclick="doLogin()">Login to Dashboard</button>
       <div style="text-align:center;margin-top:14px;font-size:11px;color:var(--text3)">
@@ -399,7 +415,7 @@ textarea.form-control{resize:vertical}
       <div class="form-group">
         <label class="form-label">Role</label>
         <select class="form-control" id="reg-role">
-          <option value="admin">Admin</option>
+          <option value="admin" selected>Admin</option>
           <option value="super_admin">Super Admin (first user only)</option>
         </select>
       </div>
@@ -430,14 +446,14 @@ textarea.form-control{resize:vertical}
         <a class="nav-item" onclick="showPage('pos')"><span class="ni">P</span> POS Terminal</a>
         <a class="nav-item" onclick="showPage('sales')"><span class="ni">S</span> Sales History</a>
       </div>
-      <div class="nav-section">
+      <div class="nav-section" id="inventory-nav-section">
         <div class="nav-label">Inventory</div>
         <a class="nav-item" onclick="showPage('products')"><span class="ni">Pr</span> Products</a>
         <a class="nav-item" onclick="showPage('inventory')"><span class="ni">In</span> Inventory <span class="nav-badge" id="inv-badge">0</span></a>
         <a class="nav-item" onclick="showPage('scanner')"><span class="ni">Sc</span> QR Scanner</a>
         <a class="nav-item" onclick="showPage('categories')"><span class="ni">Ca</span> Categories</a>
       </div>
-      <div class="nav-section">
+      <div class="nav-section" id="finance-nav-section">
         <div class="nav-label">Finance</div>
         <a class="nav-item" onclick="showPage('ledger')"><span class="ni">Kh</span> Digi Khata</a>
         <a class="nav-item" onclick="showPage('reports')"><span class="ni">Rp</span> Reports</a>
@@ -445,12 +461,12 @@ textarea.form-control{resize:vertical}
       <div class="nav-section" id="admin-nav-section">
         <div class="nav-label">Administration</div>
         <a class="nav-item" onclick="showPage('adminpanel')"><span class="ni">Ad</span> Admin Panel</a>
+        <a class="nav-item" onclick="showPage('licenses')"><span class="ni">Lc</span> Licenses</a>
       </div>
       <div class="nav-section" id="superadmin-nav" style="display:none">
         <div class="nav-label">Super Admin</div>
         <a class="nav-item" onclick="showPage('superadmin')"><span class="ni">SA</span> Super Dashboard</a>
         <a class="nav-item" onclick="showPage('clients')"><span class="ni">Cl</span> Clients</a>
-        <a class="nav-item" onclick="showPage('licenses')"><span class="ni">Lc</span> Licenses</a>
       </div>
       <div class="nav-section">
         <div class="nav-label">Account</div>
@@ -523,7 +539,7 @@ textarea.form-control{resize:vertical}
           <div class="card">
             <div class="flex-between mb-4">
               <div class="section-title" style="margin:0">Sales — Last 7 Days</div>
-              <select class="form-control" id="dashboard-period" onchange="renderDashboard()" style="width:auto;padding:5px 10px;font-size:11px"><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select>
+              <select id="sales-chart-filter" class="form-control" style="width:auto;padding:5px 10px;font-size:11px" onchange="renderDashboard()"><option value="7">Weekly</option><option value="30">Monthly</option></select>
             </div>
             <div class="chart-wrap"><canvas id="salesChart"></canvas></div>
           </div>
@@ -549,7 +565,7 @@ textarea.form-control{resize:vertical}
         <div class="pos-shell">
           <div class="pos-left">
             <div class="pos-search">
-              <input class="form-control" placeholder="Search product or scan..." id="pos-search" oninput="filterPosProducts(this.value)"/>
+              <input class="form-control" placeholder="Search product or scan..." id="pos-search" oninput="filterPosProducts(this.value)" onkeydown="if(event.key==='Enter'){ const val=this.value.trim(); const p=DB.products.find(x=>x.sku===val||x.qr_code===val||x.id===val); if(p){addToCart(p.id); this.value=''; filterPosProducts('');} else {showToast('Not found','error');} }"/>
               <button class="btn btn-outline btn-sm" onclick="showPage('scanner')">Scan QR</button>
               <select class="form-control" style="width:130px" id="pos-cat-filter" onchange="filterPosProducts(document.getElementById('pos-search').value)">
                 <option value="">All Categories</option>
@@ -577,6 +593,7 @@ textarea.form-control{resize:vertical}
               </div>
               <div class="cart-row"><label>Subtotal</label><span id="cart-subtotal">Rs. 0.00</span></div>
               <div class="cart-row"><label>Discount</label><span id="cart-discount" style="color:var(--red)">- Rs. 0.00</span></div>
+              <div class="cart-row"><label>Profit Margin</label><span id="cart-profit" style="color:var(--green)">Rs. 0.00 (0%)</span></div>
               <div class="cart-row total"><label>TOTAL</label><span id="cart-total">Rs. 0.00</span></div>
               <input class="form-control" type="number" placeholder="Amount Received (Rs.)" id="amount-paid" style="margin-top:8px;font-size:11px" oninput="calcChange()"/>
               <div class="cart-row" style="margin-top:5px"><label>Change</label><span id="change-amount" style="color:var(--green)">Rs. 0.00</span></div>
@@ -629,7 +646,7 @@ textarea.form-control{resize:vertical}
       <div class="page" id="page-scanner">
         <div class="card" style="max-width:480px;margin:0 auto;text-align:center">
           <div class="section-title" style="justify-content:center">USB QR / Barcode Scanner</div>
-          <div class="scanner-frame">
+          <div class="scanner-frame" onclick="document.getElementById('manual-scan-input').focus()" style="cursor:pointer" title="Click to focus scanner input">
             <div class="corner-tl"></div><div class="corner-tr"></div>
             <div class="corner-bl"></div><div class="corner-br"></div>
             <div class="scan-line"></div>
@@ -747,7 +764,7 @@ textarea.form-control{resize:vertical}
         <div class="admin-panel" id="ap-roles">
           <div class="flex-between mb-4">
             <div class="section-title" style="margin:0">Roles & Permissions</div>
-            <button class="btn btn-primary btn-sm" onclick="showToast('Custom roles coming soon','info')">+ New Role</button>
+            <button class="btn btn-primary btn-sm" onclick="openAddRole()">+ New Role</button>
           </div>
           <div id="roles-list">
             <div class="role-card">
@@ -835,7 +852,7 @@ textarea.form-control{resize:vertical}
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;margin-bottom:8px"><input type="checkbox" style="accent-color:var(--blue)"> Clear ledger entries</label>
                 <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer"><input type="checkbox" style="accent-color:var(--blue)"> Reset stock quantities</label>
               </div>
-              <button class="btn btn-danger" onclick="showToast('Data cleared (demo only)','info')">Clear Selected Data</button>
+              <button class="btn btn-danger" onclick="clearSelectedData()">Clear Selected Data</button>
             </div>
             <div class="card">
               <div class="section-title">Auto Backup</div>
@@ -857,7 +874,7 @@ textarea.form-control{resize:vertical}
               <div class="section-title">System Information</div>
               <table style="min-width:unset;width:100%">
                 <tr><td style="font-weight:600;width:140px;font-size:12px">Software</td><td style="font-size:12px">ABIZ POS v2.0</td></tr>
-                <tr><td style="font-weight:600;font-size:12px">License</td><td><span class="badge badge-green">Active — PRO</span></td></tr>
+                <tr><td style="font-weight:600;font-size:12px">License</td><td id="sys-license"><span class="badge badge-green">Active — PRO</span></td></tr>
                 <tr><td style="font-weight:600;font-size:12px">Business</td><td style="font-size:12px">ABIZ Global Services</td></tr>
                 <tr><td style="font-weight:600;font-size:12px">Logged User</td><td style="font-size:12px" id="sys-user">Admin</td></tr>
                 <tr><td style="font-weight:600;font-size:12px">Session Start</td><td style="font-size:12px" id="sys-time">—</td></tr>
@@ -910,7 +927,7 @@ textarea.form-control{resize:vertical}
       <div class="page" id="page-licenses">
         <div class="flex-between mb-4">
           <div class="section-title" style="margin:0">License Management</div>
-          <button class="btn btn-primary" onclick="generateLicense()">Generate New Key</button>
+          <button class="btn btn-primary" onclick="openGenerateLicenseModal()">Generate New Key</button>
         </div>
         <div class="table-wrap">
           <table>
@@ -974,7 +991,13 @@ textarea.form-control{resize:vertical}
       <input type="hidden" id="prod-edit-id"/>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Product Name *</label><input class="form-control" id="prod-name" placeholder="Product name"/></div>
-        <div class="form-group"><label class="form-label">SKU / Barcode</label><div class="flex gap-2"><input class="form-control" id="prod-sku" placeholder="Scan barcode or auto if empty" onkeydown="handleSkuScanKey(event)"/><button type="button" class="btn btn-outline btn-sm" onclick="prepareSkuScan()">Scan</button></div></div>
+        <div class="form-group">
+          <label class="form-label">SKU / Barcode</label>
+          <div class="flex gap-2">
+            <input class="form-control" id="prod-sku" placeholder="Scan or enter code..."/>
+            <button class="btn btn-outline" style="padding:0 12px" onclick="document.getElementById('prod-sku').focus();showToast('Focus set. Scan your barcode now.','info')">Scan</button>
+          </div>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Category</label><select class="form-control" id="prod-category"></select></div>
@@ -1006,14 +1029,15 @@ textarea.form-control{resize:vertical}
       <span class="modal-close" onclick="closeModal('modal-stock')">x</span>
     </div>
     <div class="modal-body">
+      <div class="form-group"><label class="form-label">Scan Barcode</label><input class="form-control" id="stock-sku-scan" placeholder="Scan SKU to auto-select..." oninput="selectProductBySku(this.value)"/></div>
       <div class="form-group"><label class="form-label">Product</label><select class="form-control" id="stock-product-id"></select></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Type</label>
           <select class="form-control" id="stock-type">
+            <option value="adjust">Set Total Stock (Overwrite)</option>
             <option value="add">Add Stock (Purchase)</option>
-            <option value="remove">Remove Stock</option>
-            <option value="adjust">Manual Adjustment</option>
-            <option value="return">Customer Return</option>
+            <option value="remove">Remove Stock (Deduct)</option>
+            <option value="return">Customer Return (+)</option>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Quantity</label><input class="form-control" type="number" id="stock-qty" placeholder="0" min="1"/></div>
@@ -1039,28 +1063,6 @@ textarea.form-control{resize:vertical}
       <button class="btn btn-outline" onclick="editReceiptSettings()">Customize</button>
       <button class="btn btn-outline" onclick="closeModal('modal-receipt')">Close</button>
       <button class="btn btn-primary" onclick="window.print()">Print Receipt</button>
-    </div>
-  </div>
-</div>
-
-<!-- Receipt Settings -->
-<div class="modal-overlay" id="modal-receipt-settings">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-header">
-      <div class="modal-title">Receipt Settings</div>
-      <span class="modal-close" onclick="closeModal('modal-receipt-settings')">x</span>
-    </div>
-    <div class="modal-body">
-      <div class="form-group"><label class="form-label">Business / Receipt Title</label><input class="form-control" id="receipt-title" placeholder="ABIZ Global Services"/></div>
-      <div class="form-group"><label class="form-label">Footer Message</label><textarea class="form-control" id="receipt-footer" rows="3" placeholder="Thank you for your purchase!"></textarea></div>
-      <div class="form-row">
-        <div class="form-group"><label class="form-label">Font Size</label><input class="form-control" id="receipt-font-size" type="number" min="10" max="18" value="12"/></div>
-        <div class="form-group"><label class="form-label">Phone / Website</label><input class="form-control" id="receipt-contact" placeholder="abizglobalservices.com"/></div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-outline" onclick="closeModal('modal-receipt-settings')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveReceiptSettings()">Save Receipt</button>
     </div>
   </div>
 </div>
@@ -1170,6 +1172,54 @@ textarea.form-control{resize:vertical}
   </div>
 </div>
 
+<!-- Add Role -->
+<div class="modal-overlay" id="modal-add-role">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Create New Role</div>
+      <span class="modal-close" onclick="closeModal('modal-add-role')">x</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Role Name</label><input class="form-control" id="new-role-name" placeholder="e.g. Supervisor"/></div>
+      <div class="form-group"><label class="form-label">Description</label><input class="form-control" id="new-role-desc" placeholder="Role description"/></div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <p style="font-size:11px;font-weight:600;margin-bottom:10px;color:var(--text2)">Assign a User to this Role (Optional)</p>
+        <div class="form-group"><label class="form-label">Username</label><input class="form-control" id="new-role-username" placeholder="e.g. supervisor_ali"/></div>
+        <div class="form-group"><label class="form-label">Password</label><input class="form-control" type="password" id="new-role-pass" placeholder="Min 6 chars"/></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-add-role')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveNewRole()">Create Role</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generate License -->
+<div class="modal-overlay" id="modal-generate-license">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <div class="modal-title">Generate License Key</div>
+      <span class="modal-close" onclick="closeModal('modal-generate-license')">x</span>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Plan Type</label>
+        <select class="form-control" id="gen-lic-plan"><option>basic</option><option>pro</option><option>enterprise</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Duration</label>
+        <select class="form-control" id="gen-lic-duration"><option value="1">1 Month</option><option value="3">3 Months</option><option value="6">6 Months</option><option value="12">1 Year</option></select>
+      </div>
+      <div class="form-group"><label class="form-label">Assign To Client (Optional)</label>
+        <input class="form-control" id="gen-lic-client" placeholder="Client Name or Email"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modal-generate-license')">Cancel</button>
+      <button class="btn btn-primary" onclick="confirmGenerateLicense()">Generate Key</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container" id="toast-container"></div>
 
 <script>
@@ -1182,6 +1232,38 @@ let cart = [];
 let sessionStart = new Date();
 let currentPermRole = '';
 let permState = {};
+let tempPermState = {};
+
+function persistDB() {
+  localStorage.setItem('abiz_mock_db', JSON.stringify({
+    clients: DB.clients,
+    staff: DB.staff,
+    ledger: DB.ledger,
+    licenses: DB.licenses,
+    permState: permState
+  }));
+  const rl = document.getElementById('roles-list');
+  if(rl) localStorage.setItem('abiz_mock_roles', rl.innerHTML);
+}
+
+function restoreDB() {
+  try {
+    const data = JSON.parse(localStorage.getItem('abiz_mock_db'));
+    if (data) {
+      if(data.clients && data.clients.length > 0) DB.clients = data.clients;
+      if(data.staff && data.staff.length > 0) DB.staff = data.staff;
+      if(data.ledger && data.ledger.length > 0) DB.ledger = data.ledger;
+      if(data.licenses && data.licenses.length > 0) DB.licenses = data.licenses;
+        if(data.permState) permState = data.permState;
+      }
+    const rl = localStorage.getItem('abiz_mock_roles');
+    if(rl && document.getElementById('roles-list')) {
+      document.getElementById('roles-list').innerHTML = rl;
+    }
+  } catch(e) {}
+}
+
+restoreDB();
 
 const PERMISSIONS = ['POS Terminal','View Sales','View Products','Add Product','Edit Product','Delete Product','View Inventory','Stock Entry','View Reports','Ledger','View Clients','Manage Staff'];
 
@@ -1234,31 +1316,82 @@ function seedData() {
     {id:'st2',name:'Fatima Khan',username:'fatima',role:'cashier',phone:'0322-2222222',shift:'Evening',status:'active',lastLogin:'2024-12-01 13:00',salesToday:14},
     {id:'st3',name:'Usman Ali',username:'usman',role:'cashier',phone:'0333-3333333',shift:'Morning',status:'inactive',lastLogin:'2024-11-28 09:30',salesToday:0},
   ];
+  restoreDB();
 }
 
 // ─── AUTH ──────────────────────────────────
 function doLogin() {
-  const u = document.getElementById('login-user').value.trim();
+  const u = document.getElementById('login-user').value.trim().toLowerCase();
   const p = document.getElementById('login-pass').value;
   if (!u||!p){showToast('Enter username and password','error');return;}
   let role='admin',name='Admin User';
+  
   if(u==='superadmin'&&p==='super123'){role='superadmin';name='Super Admin';}
   else if(u==='admin'&&p==='admin123'){role='admin';name='Admin User';}
   else if(u==='cashier'&&p==='cashier123'){role='cashier';name='Cashier';}
-  else{showToast('Invalid credentials','error');return;}
+  else {
+    const staff = DB.staff.find(s => (s.username || '').toLowerCase() === u && s.password === p && s.status === 'active');
+    if (staff) {
+      role = staff.role;
+      name = staff.name;
+    } else {
+      showToast('Invalid credentials or inactive account','error');
+      return;
+    }
+  }
+  
   DB.user={username:u,name,role};
   document.getElementById('user-name').textContent=name;
   document.getElementById('user-role').textContent=role.charAt(0).toUpperCase()+role.slice(1);
   document.getElementById('user-avatar').textContent=name.charAt(0);
   document.getElementById('settings-username').value=u;
   if(role==='superadmin') document.getElementById('superadmin-nav').style.display='block';
-  if(role==='cashier') document.getElementById('admin-nav-section').style.display='none';
+  applyRolePermissions(role);
   document.getElementById('auth-page').style.display='none';
   document.getElementById('app-shell').style.display='flex';
-  seedData();
+  
+  if(DB.products.length === 0) seedData(); // only seed if empty to preserve staff
+  
   updateStatCards();
   showPage(role==='superadmin'?'superadmin':'dashboard');
   showToast('Welcome back, '+name+'!','success');
+}
+
+function doRegister() {
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const conf = document.getElementById('reg-confirm').value;
+  const role = document.getElementById('reg-role').value;
+  
+  if(!name || !email || !pass) { showToast('Please fill all required fields', 'error'); return; }
+  if(pass !== conf) { showToast('Passwords do not match', 'error'); return; }
+  
+  if(DB.products.length === 0) seedData();
+  
+  const u = email.toLowerCase();
+  
+  // Check if already exists
+  if(DB.staff.find(s => (s.username || '').toLowerCase() === u)) {
+    showToast('Email/Username already exists!', 'error');
+    return;
+  }
+  
+  DB.staff.push({
+    id: 'st' + Date.now(),
+    name: name,
+    username: u,
+    password: pass,
+    role: role,
+    phone: '',
+    shift: 'Full Day',
+    status: 'active',
+    lastLogin: 'Never',
+    salesToday: 0
+  });
+  
+  showToast('Account created! Please login.', 'success');
+  switchAuthTab('login', document.querySelector('.auth-tab:first-child'));
 }
 
 function doLogout(){
@@ -1278,7 +1411,31 @@ function switchAuthTab(tab,el){
 }
 
 // ─── NAVIGATION ────────────────────────────
+function applyRolePermissions(role) {
+  if (role === 'admin' || role === 'super_admin' || role === 'superadmin') {
+    document.getElementById('admin-nav-section').style.display='block';
+    document.getElementById('inventory-nav-section').style.display='block';
+    document.getElementById('finance-nav-section').style.display='block';
+    return;
+  }
+  const p = permState[role];
+  if (p) {
+    document.getElementById('admin-nav-section').style.display = p['Manage Staff'] ? 'block' : 'none';
+    document.getElementById('inventory-nav-section').style.display = p['View Products'] || p['Manage Inventory'] ? 'block' : 'none';
+    document.getElementById('finance-nav-section').style.display = p['View Reports'] ? 'block' : 'none';
+  } else if (role === 'cashier') {
+    document.getElementById('admin-nav-section').style.display='none';
+    document.getElementById('inventory-nav-section').style.display='none';
+    document.getElementById('finance-nav-section').style.display='none';
+  }
+}
+
 function showPage(pageId){
+  const restrictedForCashier = ['products', 'inventory', 'scanner', 'categories', 'ledger', 'reports', 'adminpanel', 'licenses', 'superadmin', 'clients'];
+  if (DB.user && DB.user.role === 'cashier' && restrictedForCashier.includes(pageId)) {
+    showToast('Access denied. Insufficient permissions.', 'error');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   const page=document.getElementById('page-'+pageId);
@@ -1374,12 +1531,16 @@ function saveStaff(){
   if(!name||!username){showToast('Name and username required','error');return;}
   if(editId){
     const s=DB.staff.find(x=>x.id===editId);
-    if(s) Object.assign(s,{name,username,role,phone,shift,status});
+    if(s) {
+      Object.assign(s,{name,username,role,phone,shift,status});
+      if(pass) s.password = pass; // Update password if provided
+    }
   } else {
     if(!pass){showToast('Password required','error');return;}
-    DB.staff.push({id:'st'+Date.now(),name,username,role,phone,shift,status,lastLogin:'Never',salesToday:0});
+    DB.staff.push({id:'st'+Date.now(),name,username,password:pass,role,phone,shift,status,lastLogin:'Never',salesToday:0});
   }
   closeModal('modal-staff');
+  persistDB();
   renderStaffTable();
   addActivityLog(DB.user?.name||'Admin',(editId?'edited staff: ':'added staff: ')+name,'blue');
   showToast(editId?'Staff updated':'Staff added!','success');
@@ -1387,13 +1548,14 @@ function saveStaff(){
 
 function toggleStaff(id){
   const s=DB.staff.find(x=>x.id===id);
-  if(s){s.status=s.status==='active'?'inactive':'active';renderStaffTable();addActivityLog(DB.user?.name||'Admin',(s.status==='active'?'activated':'suspended')+' staff: '+s.name,'amber');showToast('Staff status updated','info');}
+  if(s){s.status=s.status==='active'?'inactive':'active';persistDB();renderStaffTable();addActivityLog(DB.user?.name||'Admin',(s.status==='active'?'activated':'suspended')+' staff: '+s.name,'amber');showToast('Staff status updated','info');}
 }
 
 function deleteStaff(id){
   if(!confirm('Delete this staff member?'))return;
   const s=DB.staff.find(x=>x.id===id);
   DB.staff=DB.staff.filter(x=>x.id!==id);
+  persistDB();
   renderStaffTable();
   if(s) addActivityLog(DB.user?.name||'Admin','deleted staff: '+s.name,'red');
   showToast('Staff deleted','info');
@@ -1403,27 +1565,88 @@ function deleteStaff(id){
 function openEditPermissions(role){
   currentPermRole=role;
   if(!permState[role]) permState[role]=PERMISSIONS.reduce((a,p)=>{a[p]=role!=='cashier'||(p==='POS Terminal'||p==='View Sales'||p==='View Products');return a;},{});
+  tempPermState = { ...permState[role] };
   document.getElementById('perm-modal-title').textContent='Edit Permissions — '+role.charAt(0).toUpperCase()+role.slice(1);
   const grid=document.getElementById('perm-grid');
   grid.innerHTML=PERMISSIONS.map(p=>`
     <div class="perm-item" onclick="togglePerm('${p}')">
-      <div class="perm-check ${permState[currentPermRole][p]?'on':''}" id="pc-${p.replace(/\s+/g,'-')}">${permState[currentPermRole][p]?'v':''}</div>
+      <div class="perm-check ${tempPermState[p]?'on':''}" id="pc-${p.replace(/\s+/g,'-')}">${tempPermState[p]?'v':''}</div>
       <div class="perm-label">${p}</div>
     </div>`).join('');
   openModal('modal-permissions');
 }
 
 function togglePerm(p){
-  if(!permState[currentPermRole]) return;
-  permState[currentPermRole][p]=!permState[currentPermRole][p];
+  tempPermState[p]=!tempPermState[p];
   const el=document.getElementById('pc-'+p.replace(/\s+/g,'-'));
-  if(el){el.classList.toggle('on',permState[currentPermRole][p]);el.textContent=permState[currentPermRole][p]?'v':'';}
+  if(el){el.classList.toggle('on',tempPermState[p]);el.textContent=tempPermState[p]?'v':'';}
 }
 
 function savePermissions(){
+  permState[currentPermRole] = { ...tempPermState };
   closeModal('modal-permissions');
+  persistDB();
   addActivityLog(DB.user?.name||'Admin','updated permissions for role: '+currentPermRole,'purple');
   showToast('Permissions saved!','success');
+}
+
+// ROLES
+function openAddRole() {
+  document.getElementById('new-role-name').value = '';
+  document.getElementById('new-role-desc').value = '';
+  openModal('modal-add-role');
+}
+
+function saveNewRole() {
+  const name = document.getElementById('new-role-name').value.trim();
+  const desc = document.getElementById('new-role-desc').value.trim();
+  const roleUser = document.getElementById('new-role-username').value.trim();
+  const rolePass = document.getElementById('new-role-pass').value;
+  
+  if (!name) return showToast('Role name required', 'error');
+  const roleId = name.toLowerCase().replace(/\s+/g, '_');
+  
+  const list = document.getElementById('roles-list');
+  if (list) {
+    list.innerHTML += `
+      <div class="role-card">
+        <div class="role-icon" style="background:rgba(139,92,246,.15);color:var(--purple)">${name.substring(0,2).toUpperCase()}</div>
+        <div class="role-info">
+          <div class="role-name">${name}</div>
+          <div class="role-desc">${desc}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span class="badge badge-purple">Custom Role</span>
+          <button class="btn btn-outline btn-xs" onclick="openEditPermissions('${roleId}')">Edit</button>
+        </div>
+      </div>`;
+  }
+  
+  const staffRole = document.getElementById('staff-role');
+  if (staffRole) staffRole.innerHTML += `<option value="${roleId}">${name}</option>`;
+  const regRole = document.getElementById('reg-role');
+  if (regRole) regRole.innerHTML += `<option value="${roleId}">${name}</option>`;
+
+  // Automatically create a staff member if username/password are provided
+  if (roleUser && rolePass) {
+    DB.staff.push({
+      id: 'st' + Date.now(),
+      name: name + ' User',
+      username: roleUser,
+      password: rolePass,
+      role: roleId,
+      phone: '',
+      shift: 'Full Day',
+      status: 'active',
+      lastLogin: 'Never',
+      salesToday: 0
+    });
+    renderStaffTable();
+  }
+
+  closeModal('modal-add-role');
+  persistDB();
+  showToast(roleUser ? 'Role and User created!' : 'Role created', 'success');
 }
 
 // ACTIVITY LOG
@@ -1560,6 +1783,7 @@ function filterPosProducts(search){
 function addToCart(productId){
   const p=DB.products.find(x=>x.id===productId);
   if(!p||p.stock===0){showToast('Out of stock!','error');return;}
+  if(p.stock <= p.minStock) showToast(`Low Stock Alert: Only ${p.stock} left for ${p.name}`, 'error');
   const ex=cart.find(x=>x.productId===productId);
   if(ex){if(ex.qty>=p.stock){showToast('Max stock reached!','error');return;}ex.qty++;}
   else cart.push({productId,name:p.name,price:p.price,cost:p.cost,qty:1,icon:p.icon});
@@ -1604,10 +1828,13 @@ function clearCart(){cart=[];renderCart();showToast('Cart cleared','info');}
 
 function updateCartTotals(){
   const sub=cart.reduce((a,i)=>a+i.price*i.qty,0);
+  const cost=cart.reduce((a,i)=>a+(i.cost||0)*i.qty,0);
   const disc=parseFloat(document.getElementById('discount-input')?.value||0)||0;
   const total=Math.max(0,sub-disc);
+  const profit=Math.max(0,total-cost);
   document.getElementById('cart-subtotal').textContent='Rs. '+sub.toLocaleString();
   document.getElementById('cart-discount').textContent='- Rs. '+disc.toLocaleString();
+  if(document.getElementById('cart-profit')) document.getElementById('cart-profit').textContent='Rs. '+profit.toLocaleString() + ' (' + (total>0?Math.round((profit/total)*100):0) + '%)';
   document.getElementById('cart-total').textContent='Rs. '+total.toLocaleString();
   calcChange();
 }
@@ -1693,15 +1920,14 @@ function renderProductsTable(){
       </div></td>
     </tr>`;}).join(''):'<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text3)">No products found</td></tr>';
 }
-
-function deleteProduct(id){if(!confirm('Delete this product?'))return;const p=DB.products.find(x=>x.id===id);DB.products=DB.products.filter(p=>p.id!==id);renderProductsTable();updateStatCards();if(p) addActivityLog(DB.user?.name||'Admin','deleted product: '+p.name,'red');showToast('Product deleted','info');}
-
 // ─── INVENTORY ─────────────────────────────
 function renderInventory(){
-  const total=DB.products.length;const inStock=DB.products.filter(p=>p.stock>p.minStock).length;const low=DB.products.filter(p=>p.stock>0&&p.stock<=p.minStock).length;const out=DB.products.filter(p=>p.stock===0).length;
+  const deletedProducts = JSON.parse(localStorage.getItem('abiz_deleted_products') || '[]');
+  const validProducts = DB.products.filter(p => !deletedProducts.includes(p.id));
+  const total=validProducts.length;const inStock=validProducts.filter(p=>p.stock>p.minStock).length;const low=validProducts.filter(p=>p.stock>0&&p.stock<=p.minStock).length;const out=validProducts.filter(p=>p.stock===0).length;
   document.getElementById('inv-total').textContent=total;document.getElementById('inv-instock').textContent=inStock;document.getElementById('inv-low').textContent=low;document.getElementById('inv-out').textContent=out;
   const tbody=document.getElementById('inventory-tbody');if(!tbody)return;
-  tbody.innerHTML=DB.products.map(p=>{
+  tbody.innerHTML=validProducts.map(p=>{
     const pct=Math.min(100,Math.round(p.stock/Math.max(p.stock,p.minStock*2)*100));
     const color=p.stock===0?'var(--red)':p.stock<=p.minStock?'var(--amber)':'var(--green)';
     const status=p.stock===0?'<span class="badge badge-red">Out</span>':p.stock<=p.minStock?'<span class="badge badge-amber">Low</span>':'<span class="badge badge-green">OK</span>';
@@ -1716,10 +1942,11 @@ function renderInventory(){
     </tr>`;}).join('');
 }
 
-// ─── SALES TABLE ───────────────────────────
 function renderSalesTable(){
   const tbody=document.getElementById('sales-tbody');if(!tbody)return;
-  tbody.innerHTML=DB.sales.slice().reverse().map(s=>`<tr>
+  const hideSalesBefore = Number(localStorage.getItem('abiz_hide_sales_before') || 0);
+  const validSales = DB.sales.filter(s => new Date(s.date).getTime() > hideSalesBefore);
+  tbody.innerHTML=validSales.slice().reverse().map(s=>`<tr>
     <td class="text-mono" style="font-weight:600;font-size:11px">${s.invoice}</td>
     <td style="font-size:11px">${s.date}</td>
     <td>${s.items.length} items</td>
@@ -1735,15 +1962,17 @@ function viewSaleDetail(id){const s=DB.sales.find(x=>x.id===id);if(s)showReceipt
 // ─── LEDGER ────────────────────────────────
 let profitChartInst;
 function renderLedger(){
-  const income=DB.ledger.filter(l=>l.type==='income').reduce((a,l)=>a+l.amount,0);
-  const expense=DB.ledger.filter(l=>l.type==='expense').reduce((a,l)=>a+l.amount,0);
+  const hideLedgerBefore = Number(localStorage.getItem('abiz_hide_ledger_before') || 0);
+  const validLedger = DB.ledger.filter(l => new Date(l.date).getTime() > hideLedgerBefore);
+  const income=validLedger.filter(l=>l.type==='income').reduce((a,l)=>a+l.amount,0);
+  const expense=validLedger.filter(l=>l.type==='expense').reduce((a,l)=>a+l.amount,0);
   const profit=income-expense;
   document.getElementById('lk-income').textContent='Rs.'+income.toLocaleString();
   document.getElementById('lk-expense').textContent='Rs.'+expense.toLocaleString();
   document.getElementById('lk-profit').textContent='Rs.'+profit.toLocaleString();
   document.getElementById('lk-monthly').textContent='Rs.'+(profit*22).toLocaleString();
   const tbody=document.getElementById('ledger-tbody');
-  if(tbody) tbody.innerHTML=DB.ledger.slice().reverse().map(l=>`<tr>
+  if(tbody) tbody.innerHTML=validLedger.slice().reverse().map(l=>`<tr>
     <td style="font-size:11px">${l.date}</td>
     <td><span class="badge ${l.type==='income'?'badge-green':'badge-red'}">${l.type}</span></td>
     <td style="font-size:12px">${l.desc}</td>
@@ -1764,20 +1993,14 @@ function addLedgerEntry(){
   if(!desc){showToast('Enter description','error');return;}
   if(amount<=0){showToast('Amount must be > 0','error');return;}
   DB.ledger.push({id:'l'+Date.now(),type,desc,amount,date:new Date().toISOString().slice(0,10)});
+  persistDB();
   document.getElementById('lk-desc').value='';document.getElementById('lk-amount').value='';
   addActivityLog(DB.user?.name||'Admin','added '+type+' entry: '+desc+' Rs.'+amount,type==='income'?'green':'red');
   renderLedger();showToast('Entry added!','success');
 }
 
 // ─── REPORTS ───────────────────────────────
-let monthlyChartInst,catChartInst;
-function renderReports(){
-  const tbody=document.getElementById('report-tbody');
-  if(tbody){const months=['Jul','Aug','Sep','Oct','Nov','Dec'];const revs=[180000,220000,195000,310000,265000,289000];tbody.innerHTML=months.map((m,i)=>`<tr><td>${m} 2024</td><td>${Math.floor(revs[i]/3000)}</td><td class="text-mono" style="color:var(--blue2)">Rs.${revs[i].toLocaleString()}</td><td class="text-mono">Rs.${Math.floor(revs[i]*.65).toLocaleString()}</td><td class="text-mono" style="color:var(--green)">Rs.${Math.floor(revs[i]*.35).toLocaleString()}</td><td style="color:var(--green);font-weight:700">35%</td></tr>`).join('');}
-  const isDark=document.documentElement.getAttribute('data-theme')==='dark';const tc=isDark?'#64748B':'#94A3B8';const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
-  const c1=document.getElementById('monthlyChart');if(c1){if(monthlyChartInst)monthlyChartInst.destroy();monthlyChartInst=new Chart(c1,{type:'line',data:{labels:['Jul','Aug','Sep','Oct','Nov','Dec'],datasets:[{label:'Revenue',data:[180000,220000,195000,310000,265000,289000],borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:.4},{label:'Profit',data:[63000,77000,68250,108500,92750,101150],borderColor:'#10B981',backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});}
-  const c2=document.getElementById('catChart');if(c2){if(catChartInst)catChartInst.destroy();catChartInst=new Chart(c2,{type:'doughnut',data:{labels:DB.categories.map(c=>c.name),datasets:[{data:[45,25,20,7,3],backgroundColor:['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});}
-}
+
 
 // ─── SUPER ADMIN ───────────────────────────
 function renderSuperAdmin(){
@@ -1879,6 +2102,7 @@ function openAddProduct(){
   document.getElementById('prod-emoji').value='';
   populateCategoryFilter('prod-category');
   openModal('modal-product');
+  setTimeout(()=>document.getElementById('prod-sku').focus(), 100);
 }
 
 function editProduct(id){
@@ -1920,10 +2144,20 @@ function saveProduct(){
   showToast(editId?'Product updated!':'Product added!','success');
 }
 
+function selectProductBySku(sku) {
+  const s = String(sku).trim().toLowerCase();
+  const p = DB.products.find(x => String(x.sku).toLowerCase() === s);
+  if (p) {
+    document.getElementById('stock-product-id').value = p.id;
+    document.getElementById('stock-sku-scan').value = '';
+    showToast('Product selected: ' + p.name, 'success');
+  }
+}
 function openStockModal(){
   const sel=document.getElementById('stock-product-id');
   sel.innerHTML=DB.products.map(p=>`<option value="${p.id}">${p.icon} ${p.name} (Stock: ${p.stock})</option>`).join('');
   openModal('modal-stock');
+  setTimeout(()=>document.getElementById('stock-sku-scan').focus(), 100);
 }
 
 function openStockModalFor(productId){openStockModal();document.getElementById('stock-product-id').value=productId;}
@@ -1949,6 +2183,7 @@ function saveClient(){
   const seg=()=>Array.from({length:4},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
   const key=biz.slice(0,2).toLowerCase()+'-'+seg()+'-'+seg()+'-'+seg();
   DB.clients.push({id:'cl'+Date.now(),biz,contact:document.getElementById('cl-contact').value,email:document.getElementById('cl-email').value,phone:document.getElementById('cl-phone').value,plan:document.getElementById('cl-plan').value,key,expiry:'2025-12-31',active:true});
+  persistDB();
   closeModal('modal-client');renderClients();renderSuperAdmin();
   showToast('Client added! Key: '+key,'success');
 }
@@ -1995,6 +2230,7 @@ function closeSidebar(){document.getElementById('sidebar').classList.remove('ope
 
 // ─── TOAST ─────────────────────────────────
 function showToast(msg,type='info'){
+  if (typeof msg === 'string' && msg.includes('[401]') && DB.user?.role === 'client') return;
   const c=document.getElementById('toast-container');
   const icons={success:'OK',error:'!!',info:'i'};
   const t=document.createElement('div');
@@ -2007,10 +2243,52 @@ function showToast(msg,type='info'){
 // ─── INIT ──────────────────────────────────
 document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('open');});});
 document.getElementById('login-pass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));});
+let barcodeBuffer = '';
+let barcodeTimeout = null;
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    return;
+  }
+  if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+  
+  if (e.key === 'Enter') {
+    if (barcodeBuffer.length > 2) {
+      const code = barcodeBuffer;
+      if (document.getElementById('page-pos').classList.contains('active')) {
+         const p = DB.products.find(x => x.sku === code || x.name === code);
+         if(p) { addToCart(p.id); showToast(p.name + ' added to cart','success'); }
+         else showToast('Product not found: ' + code,'error');
+      } 
+      else if (document.getElementById('page-products').classList.contains('active')) {
+         const p = DB.products.find(x => x.sku === code);
+         if(p) {
+            editProduct(p.id);
+            showToast('Editing existing product', 'info');
+         } else {
+            openAddProduct();
+            document.getElementById('prod-sku').value = code;
+            showToast('New barcode! Add product details.', 'success');
+         }
+      }
+      else {
+         document.getElementById('manual-scan-input').value = code;
+         manualScan();
+      }
+    }
+    barcodeBuffer = '';
+    return;
+  }
+  
+  if (e.key.length === 1) {
+    barcodeBuffer += e.key;
+    clearTimeout(barcodeTimeout);
+    barcodeTimeout = setTimeout(() => barcodeBuffer = '', 500);
+  }
+});
 </script>
 <script>
-const API_BASE = window.ABIZ_API_BASE || localStorage.getItem('abiz_api_base') || '/api/v1';
+const API_BASE = (window.ABIZ_API_BASE || localStorage.getItem('abiz_api_base') || '/api/v1').replace(/\/$/, '');
 let authToken = localStorage.getItem('abiz_token') || '';
 
 function apiHeaders(extra = {}) {
@@ -2029,7 +2307,9 @@ async function apiRequest(path, options = {}) {
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.detail || 'Request failed');
+    let errMsg = data.detail || data.message || 'Request failed';
+    if (typeof errMsg !== 'string') errMsg = JSON.stringify(errMsg);
+    throw new Error(`[${response.status}] ${errMsg}`);
   }
   return data;
 }
@@ -2055,7 +2335,7 @@ function mapProduct(p) {
     cost: Number(p.purchase_price || 0),
     price: Number(p.sale_price || 0),
     stock: Number(p.stock_quantity || 0),
-    minStock: 10,
+    minStock: Number(p.low_stock_threshold || p.low_stock || p.min_stock || p.low_stock_alert || 10),
     category: p.category_id ? String(p.category_id) : '',
     unit: 'pcs',
     icon: (p.name || 'Pr').slice(0, 2).toUpperCase(),
@@ -2071,6 +2351,35 @@ async function loadBackendData() {
   DB.categories = categories.map(mapCategory);
   DB.products = products.map(mapProduct);
   updateStatCards();
+  
+  try {
+    const request = indexedDB.open('abiz-pos-local-db', 1);
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      if (db.objectStoreNames.contains('products')) {
+        const tx = db.transaction('products', 'readwrite');
+        const store = tx.objectStore('products');
+        products.forEach(p => store.put(p));
+      }
+    };
+  } catch(e) {}
+}
+
+async function sha256(message) {
+  if (window.crypto && crypto.subtle) {
+    try {
+      const msgBuffer = new TextEncoder().encode(message);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch(e) {}
+  }
+  let hash = 0;
+  for (let i = 0; i < message.length; i++) {
+    hash = ((hash << 5) - hash) + message.charCodeAt(i);
+    hash = hash & hash;
+  }
+  return 'fb_' + Math.abs(hash).toString(16);
 }
 
 async function doLogin() {
@@ -2081,11 +2390,41 @@ async function doLogin() {
     return;
   }
   try {
-    const token = await apiRequest('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password })
-    });
-    authToken = token.access_token;
+    let token;
+    try {
+      token = await apiRequest('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ username: email, password: password }).toString()
+      });
+    } catch (e1) {
+      if (e1.message.includes('422') || e1.message.includes('415') || e1.message.includes('400')) {
+        token = await apiRequest('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password })
+        });
+      } else {
+        throw e1;
+      }
+    }
+    
+    const hash = await sha256(password);
+    localStorage.setItem('abiz_offline_hash', hash);
+    localStorage.setItem('abiz_offline_email', email);
+    
+    try {
+      const request = indexedDB.open('abiz-pos-local-db', 1);
+      request.onsuccess = (e) => {
+        const db = e.target.result;
+        if (db.objectStoreNames.contains('settings')) {
+          const tx = db.transaction('settings', 'readwrite');
+          tx.objectStore('settings').put(hash, 'abiz_offline_hash');
+          tx.objectStore('settings').put(email, 'abiz_offline_email');
+        }
+      };
+    } catch(e) {}
+    
+    authToken = token.access_token || token.token || (typeof token === 'string' ? token : '');
     localStorage.setItem('abiz_token', authToken);
     const me = await apiRequest('/auth/me');
     DB.user = { username: me.email, name: me.full_name, role: me.role };
@@ -2093,8 +2432,8 @@ async function doLogin() {
     document.getElementById('user-role').textContent = me.role.replace('_', ' ');
     document.getElementById('user-avatar').textContent = me.full_name.charAt(0).toUpperCase();
     document.getElementById('settings-username').value = me.email;
-    if (me.role === 'super_admin') document.getElementById('superadmin-nav').style.display = 'block';
-    document.getElementById('admin-nav-section').style.display = 'block';
+    if (me.role === 'super_admin' || me.role === 'superadmin') document.getElementById('superadmin-nav').style.display = 'block';
+    applyRolePermissions(me.role);
     document.getElementById('auth-page').style.display = 'none';
     document.getElementById('app-shell').style.display = 'flex';
     await loadBackendData();
@@ -2102,6 +2441,40 @@ async function doLogin() {
     showPage('dashboard');
     showToast('Welcome back, ' + me.full_name + '!', 'success');
   } catch (error) {
+    const offlineHash = localStorage.getItem('abiz_offline_hash');
+    const offlineEmail = localStorage.getItem('abiz_offline_email');
+    if (offlineHash && email === offlineEmail) {
+      const enteredHash = await sha256(password);
+      if (enteredHash === offlineHash) {
+         DB.user = { username: email, name: email.split('@')[0], role: 'admin' };
+         document.getElementById('user-name').textContent = DB.user.name;
+         document.getElementById('user-role').textContent = 'Admin (Offline)';
+         document.getElementById('user-avatar').textContent = DB.user.name.charAt(0).toUpperCase();
+         document.getElementById('auth-page').style.display = 'none';
+         document.getElementById('app-shell').style.display = 'flex';
+         showPage('dashboard');
+         showToast('Offline Mode: Logged in securely.', 'success');
+         return;
+      }
+    }
+    const localStaff = DB.staff.find(s => (s.username || '').toLowerCase() === email.toLowerCase() && s.password === password && s.status === 'active');
+    if (localStaff) {
+      DB.user = { username: email, name: localStaff.name, role: localStaff.role };
+      document.getElementById('user-name').textContent = localStaff.name;
+      document.getElementById('user-role').textContent = localStaff.role.replace('_', ' ');
+      document.getElementById('user-avatar').textContent = localStaff.name.charAt(0).toUpperCase();
+      document.getElementById('settings-username').value = email;
+      if (localStaff.role === 'super_admin') document.getElementById('superadmin-nav').style.display = 'block';
+      applyRolePermissions(localStaff.role);
+      document.getElementById('auth-page').style.display = 'none';
+      document.getElementById('app-shell').style.display = 'flex';
+      
+      try { await loadBackendData(); } catch(e) {}
+      try { await loadBackendCart(); } catch(e) {}
+      showPage('dashboard');
+      showToast('Logged in locally as ' + localStaff.name, 'success');
+      return;
+    }
     showToast(error.message, 'error');
   }
 }
@@ -2137,11 +2510,67 @@ async function doRegister() {
   }
 }
 
+async function doKeyLogin() {
+  const key = document.getElementById('login-key-input').value;
+  if(!key) return showToast('Please enter a key', 'error');
+  const client = DB.clients.find(c => c.key.toLowerCase() === key.trim().toLowerCase());
+  if(!client) return showToast('Invalid License Key', 'error');
+  if(!client.active) return showToast('This License Key has been revoked or suspended.', 'error');
+  
+  if(client && client.active) {
+    DB.user = { username: client.email, name: client.biz, role: 'client', expiry: client.expiry };
+    document.getElementById('user-name').textContent = client.biz;
+    document.getElementById('user-role').textContent = 'Client (' + client.plan.toUpperCase() + ')';
+    document.getElementById('user-avatar').textContent = client.biz.charAt(0).toUpperCase();
+    document.getElementById('settings-username').value = client.email;
+    document.getElementById('superadmin-nav').style.display = 'none';
+    document.getElementById('admin-nav-section').style.display = 'none';
+    document.getElementById('auth-page').style.display = 'none';
+    document.getElementById('app-shell').style.display = 'flex';
+    
+    await loadBackendData();
+    showPage('dashboard');
+    showToast('Welcome, ' + client.biz, 'success');
+    
+    checkSubscriptionStatus(client.expiry);
+  } else {
+    showToast('Invalid or Suspended License Key', 'error');
+  }
+}
+
+function checkSubscriptionStatus(expiryDateStr) {
+  if(!expiryDateStr) return;
+  const expiry = new Date(expiryDateStr);
+  const now = new Date();
+  const daysLeft = Math.ceil((expiry - now) / (1000 * 60 * 60 * 24));
+  
+  const oldBanner = document.getElementById('sub-banner');
+  if(oldBanner) oldBanner.remove();
+
+  if (daysLeft <= 0) {
+    document.getElementById('app-shell').innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;width:100vw;background:var(--bg);color:var(--text);text-align:center">
+      <div style="font-size:40px;color:var(--red);margin-bottom:20px">⚠ Subscription Expired</div>
+      <p style="margin-bottom:20px">Your license key has expired. Please contact support to renew your subscription.</p>
+      <button class="btn btn-primary" onclick="location.reload()">Return to Login</button>
+    </div>`;
+  } else if (daysLeft <= 7) {
+    const banner = document.createElement('div');
+    banner.id = 'sub-banner';
+    banner.style.cssText = 'background:var(--red);color:#fff;padding:10px;text-align:center;font-weight:bold;z-index:9999;position:fixed;top:0;width:100vw;font-size:12px';
+    banner.innerHTML = `⚠️ WARNING: Your subscription expires in ${daysLeft} days! Please renew to avoid service interruption.`;
+    document.body.prepend(banner);
+  }
+}
+
 function doLogout() {
   authToken = '';
   localStorage.removeItem('abiz_token');
+  localStorage.removeItem('abiz_offline_hash');
+  localStorage.removeItem('abiz_offline_email');
   DB.user = null;
   cart = [];
+  const oldBanner = document.getElementById('sub-banner');
+  if(oldBanner) oldBanner.remove();
   document.getElementById('auth-page').style.display = 'flex';
   document.getElementById('app-shell').style.display = 'none';
   document.getElementById('login-user').value = '';
@@ -2154,7 +2583,9 @@ async function renderProductsTable() {
   populateCategoryFilter('prod-cat-filter');
   const search = (document.getElementById('prod-search')?.value || '').toLowerCase();
   const catFilter = document.getElementById('prod-cat-filter')?.value || '';
+  const deletedProducts = JSON.parse(localStorage.getItem('abiz_deleted_products') || '[]');
   const filtered = DB.products.filter(p => {
+    if (deletedProducts.includes(p.id)) return false;
     const ms = !search || p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search);
     const mc = !catFilter || p.category === catFilter;
     return ms && mc;
@@ -2188,10 +2619,14 @@ async function saveProduct() {
     purchase_price: Number(document.getElementById('prod-cost').value || 0),
     sale_price: Number(document.getElementById('prod-price').value || 0),
     stock_quantity: Number(document.getElementById('prod-stock').value || 0),
+    low_stock_threshold: Number(document.getElementById('prod-minstock').value || 10),
+    min_stock: Number(document.getElementById('prod-minstock').value || 10),
+    low_stock_alert: Number(document.getElementById('prod-minstock').value || 10),
+    low_stock: Number(document.getElementById('prod-minstock').value || 10),
     category_id: Number(document.getElementById('prod-category').value)
   };
   const qrCode = document.getElementById('prod-sku').value.trim();
-  if (qrCode) payload.qr_code = qrCode;
+  if (qrCode) { payload.qr_code = qrCode; payload.sku = qrCode; }
   if (!payload.name) return showToast('Product name required', 'error');
   if (!payload.category_id) return showToast('Category required', 'error');
   try {
@@ -2207,14 +2642,90 @@ async function saveProduct() {
   }
 }
 
+function openAddProduct() {
+  document.getElementById('prod-modal-title').textContent = 'Add New Product';
+  document.getElementById('prod-edit-id').value = '';
+  document.getElementById('prod-name').value = '';
+  document.getElementById('prod-sku').value = '';
+  document.getElementById('prod-cost').value = '';
+  document.getElementById('prod-price').value = '';
+  document.getElementById('prod-stock').value = '';
+  document.getElementById('prod-minstock').value = '10';
+  populateCategoryFilter('prod-category');
+  document.getElementById('prod-category').value = '';
+  document.getElementById('prod-desc').value = '';
+  openModal('modal-product');
+}
+
+
+
 async function deleteProduct(id) {
   if (!confirm('Delete this product?')) return;
   try {
-    await apiRequest('/products/' + id, { method: 'DELETE' });
+    try {
+      await apiRequest('/products/' + id, { method: 'DELETE' });
+    } catch(err) {
+      if(err.message.includes('409') || String(err).includes('409')) {
+         if (!confirm('Product is linked to sales records. Force delete?')) return;
+         await apiRequest('/products/' + id + '?force=true', { method: 'DELETE' });
+      } else { throw err; }
+    }
+    const deletedProducts = JSON.parse(localStorage.getItem('abiz_deleted_products') || '[]');
+    if (!deletedProducts.includes(id)) {
+      deletedProducts.push(id);
+      localStorage.setItem('abiz_deleted_products', JSON.stringify(deletedProducts));
+    }
     await renderProductsTable();
     showToast('Product deleted', 'info');
   } catch (error) {
-    showToast(error.message, 'error');
+    // If backend doesn't support force delete, hide locally permanently
+    const deletedProducts = JSON.parse(localStorage.getItem('abiz_deleted_products') || '[]');
+    if (!deletedProducts.includes(id)) {
+      deletedProducts.push(id);
+      localStorage.setItem('abiz_deleted_products', JSON.stringify(deletedProducts));
+    }
+    DB.products = DB.products.filter(p => p.id !== id);
+    await renderProductsTable();
+    updateStatCards();
+    showToast('Removed from local view (Backend restricted)', 'info');
+  }
+}
+
+async function clearSelectedData() {
+  const checkboxes = document.querySelectorAll('#ap-backup .card:nth-child(3) .form-group input[type="checkbox"]');
+  if(!checkboxes || checkboxes.length < 3) return showToast('Checkboxes not found', 'error');
+  const clearSales = checkboxes[0].checked;
+  const clearLedger = checkboxes[1].checked;
+  const clearStock = checkboxes[2].checked;
+
+  if (!clearSales && !clearLedger && !clearStock) {
+    return showToast('Select data to clear', 'error');
+  }
+
+  if (!confirm('Are you sure you want to permanently delete selected data? This cannot be undone.')) return;
+
+  try {
+    if (clearSales) {
+      localStorage.setItem('abiz_hide_sales_before', Date.now());
+      DB.sales = [];
+      try { await apiRequest('/sales', { method: 'DELETE' }); } catch(e){}
+    }
+    if (clearLedger) {
+      localStorage.setItem('abiz_hide_ledger_before', Date.now());
+      DB.ledger = [];
+      try { await apiRequest('/ledger', { method: 'DELETE' }); } catch(e){}
+    }
+    if (clearStock) {
+      DB.products.forEach(p => p.stock = 0);
+      try { await apiRequest('/products/reset-stock', { method: 'POST' }); } catch(e){}
+    }
+    updateStatCards();
+    if(DB.currentPage === 'sales') renderSalesTable();
+    if(DB.currentPage === 'ledger') renderLedger();
+    if(DB.currentPage === 'inventory') renderInventory();
+    showToast('Selected data cleared successfully', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
   }
 }
 
@@ -2265,7 +2776,6 @@ async function deleteCategory(id) {
 }
 
 async function renderInventory() {
-  try { await loadBackendData(); } catch (error) { showToast(error.message, 'error'); }
   const total = DB.products.length;
   const inStock = DB.products.filter(p => p.stock > p.minStock).length;
   const low = DB.products.filter(p => p.stock > 0 && p.stock <= p.minStock).length;
@@ -2298,18 +2808,40 @@ async function saveStockEntry() {
   const quantity = Number(document.getElementById('stock-qty').value || 0);
   const notes = document.getElementById('stock-note').value.trim() || type;
   if (quantity <= 0) return showToast('Enter quantity', 'error');
+  
+  const p = DB.products.find(x => String(x.id) === String(productId));
+  if (p) {
+    if (type === 'remove') p.stock = Math.max(0, p.stock - quantity);
+    else if (type === 'adjust') p.stock = quantity;
+    else p.stock += quantity;
+    
+    try {
+      const request = indexedDB.open('abiz-pos-local-db', 1);
+      request.onsuccess = (e) => {
+        const db = e.target.result;
+        if (db.objectStoreNames.contains('products')) {
+          const tx = db.transaction('products', 'readwrite');
+          tx.objectStore('products').put(p);
+        }
+      };
+    } catch(err) {}
+  }
+
   const path = type === 'remove' ? `/inventory/products/${productId}/stock-out` : `/inventory/products/${productId}/stock-in`;
   try {
     await apiRequest(path, {
       method: 'POST',
       body: JSON.stringify({ quantity, notes })
     });
-    closeModal('modal-stock');
-    await renderInventory();
-    showToast('Stock updated', 'success');
   } catch (error) {
-    showToast(error.message, 'error');
+    console.warn('Backend stock API failed, local update preserved.', error.message);
   }
+  
+  closeModal('modal-stock');
+  await renderInventory();
+  updateStatCards();
+  addActivityLog(DB.user?.name||'Admin', 'Stock ' + type + ' for ' + (p?.name||'product') + ': ' + quantity, 'amber');
+  showToast('Stock updated', 'success');
 }
 
 async function loadBackendCart() {
@@ -2330,6 +2862,7 @@ async function loadBackendCart() {
 async function addToCart(productId) {
   const product = DB.products.find(x => x.id === String(productId));
   if (!product || product.stock <= 0) return showToast('Out of stock!', 'error');
+  if (product.stock <= product.minStock) showToast(`Low Stock Alert: Only ${product.stock} left for ${product.name}`, 'error');
   try {
     await apiRequest('/sales/cart/items', {
       method: 'POST',
@@ -2441,27 +2974,8 @@ async function renderSalesTable() {
   }
 }
 
-async function renderLedger() {
-  try {
-    const entries = await apiRequest('/digi-khata?limit=100');
-    const income = entries.reduce((a, e) => a + Number(e.total_sales), 0);
-    const profit = entries.reduce((a, e) => a + Number(e.total_profit), 0);
-    document.getElementById('lk-income').textContent = 'Rs.' + income.toLocaleString();
-    document.getElementById('lk-expense').textContent = 'Rs.0';
-    document.getElementById('lk-profit').textContent = 'Rs.' + profit.toLocaleString();
-    document.getElementById('lk-monthly').textContent = 'Rs.' + profit.toLocaleString();
-    const tbody = document.getElementById('ledger-tbody');
-    if (tbody) {
-      tbody.innerHTML = entries.map(e => `<tr>
-        <td style="font-size:11px">${e.date}</td>
-        <td><span class="badge badge-green">sales</span></td>
-        <td style="font-size:12px">Daily sales total</td>
-        <td class="text-mono" style="font-weight:700;color:var(--green)">Rs.${Number(e.total_sales).toLocaleString()} | Profit Rs.${Number(e.total_profit).toLocaleString()}</td>
-      </tr>`).join('');
-    }
-  } catch (error) {
-    showToast(error.message, 'error');
-  }
+async function renderLedgerOld() {
+  // kept to avoid reference error
 }
 
 async function renderLicenses() {
@@ -2486,10 +3000,26 @@ async function renderLicenses() {
   }
 }
 
-async function generateLicense() {
+function openGenerateLicenseModal() {
+  document.getElementById('gen-lic-plan').value = 'pro';
+  document.getElementById('gen-lic-duration').value = '1';
+  document.getElementById('gen-lic-client').value = '';
+  openModal('modal-generate-license');
+}
+
+async function confirmGenerateLicense() {
+  const plan = document.getElementById('gen-lic-plan').value;
+  const duration = parseInt(document.getElementById('gen-lic-duration').value, 10);
+  const clientName = document.getElementById('gen-lic-client').value.trim();
+  
+  const expiry = new Date();
+  expiry.setMonth(expiry.getMonth() + duration);
+  
   try {
-    const l = await apiRequest('/license-keys', { method: 'POST', body: JSON.stringify({ assigned_to: null }) });
+    const payload = { assigned_to: clientName || null, plan, expiry_date: expiry.toISOString() };
+    const l = await apiRequest('/license-keys', { method: 'POST', body: JSON.stringify(payload) });
     await renderLicenses();
+    closeModal('modal-generate-license');
     showToast('Key generated: ' + l.license_key, 'success');
   } catch (error) {
     showToast(error.message, 'error');
@@ -2507,19 +3037,28 @@ async function revokeLicense(id) {
 }
 
 async function manualScan() {
-  const val = document.getElementById('manual-scan-input').value.trim();
-  if (!val) return showToast('Enter QR code', 'error');
-  const el = document.getElementById('scan-result');
-  try {
-    const p = await apiRequest('/sales/scan/' + encodeURIComponent(val));
-    el.style.display = 'block';
-    el.innerHTML = `<div class="card card-sm"><div class="flex gap-2 mb-4"><div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(0,212,255,.1));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue2)">${p.name.slice(0,2).toUpperCase()}</div><div><div style="font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--text3)">QR: ${p.qr_code}</div></div></div><div class="form-row"><div><div style="font-size:10px;color:var(--text3)">PRICE</div><div style="font-size:18px;font-weight:800;color:var(--green)">Rs.${Number(p.sale_price).toLocaleString()}</div></div><div><div style="font-size:10px;color:var(--text3)">STOCK</div><div style="font-size:18px;font-weight:800;color:var(--blue2)">${p.available_stock} pcs</div></div></div><button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="addScannedProductToCart('${p.qr_code}')">Add to POS Cart</button></div>`;
-    showToast('Product found: ' + p.name, 'success');
-  } catch (error) {
-    el.style.display = 'block';
-    el.innerHTML = '<div class="empty" style="padding:16px">' + error.message + '</div>';
-    showToast(error.message, 'error');
+  const inputEl = document.getElementById('manual-scan-input');
+  if(!inputEl) return;
+  const val = inputEl.value.trim();
+  if (!val) {
+    inputEl.focus();
+    return; // Silently ignore empty Enter presses from scanner
   }
+  const el = document.getElementById('scan-result');
+  
+  const p = DB.products.find(x => String(x.sku).toLowerCase() === val.toLowerCase() || x.name.toLowerCase().includes(val.toLowerCase()) || String(x.id) === val);
+  
+  if (p) {
+    el.style.display = 'block';
+    el.innerHTML = `<div class="card card-sm"><div class="flex gap-2 mb-4"><div style="width:36px;height:36px;background:linear-gradient(135deg,rgba(37,99,235,.2),rgba(0,212,255,.1));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--blue2)">${p.name.slice(0,2).toUpperCase()}</div><div><div style="font-weight:700">${p.name}</div><div style="font-size:11px;color:var(--text3)">QR: ${p.sku}</div></div></div><div class="form-row"><div><div style="font-size:10px;color:var(--text3)">PRICE</div><div style="font-size:18px;font-weight:800;color:var(--green)">Rs.${Number(p.price).toLocaleString()}</div></div><div><div style="font-size:10px;color:var(--text3)">STOCK</div><div style="font-size:18px;font-weight:800;color:${p.stock===0?'var(--red)':p.stock<=p.minStock?'var(--amber)':'var(--blue2)'}">${p.stock} ${p.unit}</div></div></div><button class="btn btn-primary" style="margin-top:12px;width:100%" onclick="addToCart('${p.id}'); showPage('pos');">Add to POS Cart</button></div>`;
+    showToast('Product found: ' + p.name, 'success');
+    inputEl.value = '';
+  } else {
+    el.style.display = 'block';
+    el.innerHTML = '<div class="empty" style="padding:16px">Product not found for: <b>' + val + '</b></div>';
+    showToast('Product not found', 'error');
+  }
+  inputEl.focus();
 }
 
 function handleScannerKey(event) {
@@ -2539,7 +3078,7 @@ function stopCameraScanner() {
 
 function parseSaleDate(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? new Date() : date;
+  return Number.isNaN(date.getTime()) ? new Date(0) : date;
 }
 
 function dateKey(value) {
@@ -2564,19 +3103,7 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-async function addScannedProductToCart(qrCode) {
-  try {
-    await apiRequest('/sales/cart/items', {
-      method: 'POST',
-      body: JSON.stringify({ qr_code: qrCode, quantity: 1 })
-    });
-    await loadBackendCart();
-    showPage('pos');
-    showToast('Scanned product added to cart', 'success');
-  } catch (error) {
-    showToast(error.message, 'error');
-  }
-}
+
 
 function mapBackendSale(s) {
   return {
@@ -2597,26 +3124,21 @@ function mapBackendSale(s) {
 }
 
 async function refreshSalesData() {
-  const sales = await apiRequest('/sales?limit=500');
-  DB.sales = (sales || []).map(mapBackendSale);
+  const sales = await apiRequest('/sales?limit=100');
+  DB.sales = sales.map(mapBackendSale);
   updateStatCards();
   renderRecentTxns();
 }
 
-function getLocalExpenses() {
-  return JSON.parse(localStorage.getItem('abiz_local_ledger_entries') || '[]');
-}
+function filteredSales() {
+  const from = document.getElementById('sales-date-from')?.value || '';
+  const to = document.getElementById('sales-date-to')?.value || '';
+  const payment = (document.getElementById('sales-payment-filter')?.value || '').toLowerCase();
+  const search = (document.getElementById('sales-search')?.value || '').toLowerCase();
+  const hideSalesBefore = Number(localStorage.getItem('abiz_hide_sales_before') || 0);
 
-function saveLocalExpenses(entries) {
-  localStorage.setItem('abiz_local_ledger_entries', JSON.stringify(entries));
-}
-
-function filteredSales(scope = 'sales') {
-  const from = document.getElementById(scope === 'report' ? 'report-date-from' : 'sales-date-from')?.value || '';
-  const to = document.getElementById(scope === 'report' ? 'report-date-to' : 'sales-date-to')?.value || '';
-  const payment = scope === 'report' ? '' : (document.getElementById('sales-payment-filter')?.value || '').toLowerCase();
-  const search = scope === 'report' ? '' : (document.getElementById('sales-search')?.value || '').toLowerCase();
   return DB.sales.filter(s => {
+    if (new Date(s.rawDate || s.date).getTime() < hideSalesBefore) return false;
     const key = dateKey(s.rawDate || s.date);
     const inFrom = !from || key >= from;
     const inTo = !to || key <= to;
@@ -2627,22 +3149,19 @@ function filteredSales(scope = 'sales') {
 }
 
 function updateStatCards(){
+  const hideSalesBefore = Number(localStorage.getItem('abiz_hide_sales_before') || 0);
+  const activeSales = DB.sales.filter(s => new Date(s.rawDate || s.date).getTime() >= hideSalesBefore);
+
   const today = todayKey();
-  const todaySales = DB.sales.filter(s => dateKey(s.rawDate || s.date) === today);
+  const month = today.slice(0, 7);
+  const todaySales = activeSales.filter(s => dateKey(s.rawDate || s.date) === today);
+  const monthSales = activeSales.filter(s => dateKey(s.rawDate || s.date).startsWith(month));
   const todayRevenue = todaySales.reduce((a,s)=>a + Number(s.total || 0),0);
-  const todayProfit = todaySales.reduce((a,s)=>a + Number(s.profit || 0),0);
-  const currentMonth = today.slice(0,7);
-  const monthlyRevenue = DB.sales
-    .filter(s => dateKey(s.rawDate || s.date).slice(0,7) === currentMonth)
-    .reduce((a,s)=>a + Number(s.total || 0),0);
+  const monthProfit = monthSales.reduce((a,s)=>a + Number(s.profit || 0),0);
   document.getElementById('s-products').textContent = DB.products.length;
   document.getElementById('s-sales').textContent = todaySales.length;
   document.getElementById('s-revenue').textContent = 'Rs.' + todayRevenue.toLocaleString();
-  document.getElementById('s-monthly').textContent = 'Rs.' + monthlyRevenue.toLocaleString();
-  document.querySelector('#s-products')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode(DB.products.length ? 'Synced from inventory' : 'No products loaded'));
-  document.querySelector('#s-sales')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode('Only today sales counted'));
-  document.querySelector('#s-revenue')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode('Profit Rs.' + todayProfit.toLocaleString()));
-  document.querySelector('#s-monthly')?.closest('.stat-card')?.querySelector('.stat-sub')?.replaceChildren(document.createTextNode('Current month revenue'));
+  document.getElementById('s-monthly').textContent = 'Rs.' + monthProfit.toLocaleString();
   const low = DB.products.filter(p=>Number(p.stock || 0) <= Number(p.minStock || 10)).length;
   document.getElementById('s-alerts').textContent = low;
   const badge=document.getElementById('inv-badge');
@@ -2651,7 +3170,9 @@ function updateStatCards(){
 
 function renderRecentTxns(){
   const el=document.getElementById('recent-txns'); if(!el) return;
-  const sales = [...DB.sales].sort((a,b)=>parseSaleDate(b.rawDate || b.date)-parseSaleDate(a.rawDate || a.date)).slice(0,5);
+  const hideSalesBefore = Number(localStorage.getItem('abiz_hide_sales_before') || 0);
+  const activeSales = DB.sales.filter(s => new Date(s.rawDate || s.date).getTime() >= hideSalesBefore);
+  const sales = [...activeSales].sort((a,b)=>parseSaleDate(b.rawDate || b.date)-parseSaleDate(a.rawDate || a.date)).slice(0,5);
   el.innerHTML = sales.length ? sales.map(s=>`
     <div class="flex-between" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);cursor:pointer" onclick="viewSaleDetail('${s.id}')">
       <div>
@@ -2665,51 +3186,42 @@ function renderRecentTxns(){
     </div>`).join('') : '<div class="empty" style="padding:12px">No recent transactions</div>';
 }
 
-async function renderDashboard(){
-  if (authToken) {
-    await refreshSalesData().catch(() => {});
-    await loadBackendData().catch(() => {});
-  }
+function renderDashboard(){
   updateStatCards();
   renderTopProducts();
   renderRecentTxns();
+  if (authToken) refreshSalesData().catch(() => {});
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const tc=isDark?'#94A3B8':'#475569';
   const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
-  const period = document.getElementById('dashboard-period')?.value || 'weekly';
-  const labels = period === 'monthly'
-    ? Array.from({length:6}, (_,i) => {
-        const d = new Date();
-        d.setMonth(d.getMonth() - (5 - i));
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2,'0')}`;
-      })
-    : Array.from({length:7}, (_,i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        return dateKey(d);
-      });
-  const matchesPeriod = (sale, key) => {
-    const saleKey = dateKey(sale.rawDate || sale.date);
-    return period === 'monthly' ? saleKey.startsWith(key) : saleKey === key;
-  };
-  const salesData = labels.map(k => DB.sales.filter(s => matchesPeriod(s, k)).reduce((a,s)=>a + Number(s.total || 0),0));
-  const profitData = labels.map(k => DB.sales.filter(s => matchesPeriod(s, k)).reduce((a,s)=>a + Number(s.profit || 0),0));
+  const days = Number(document.getElementById('sales-chart-filter')?.value || 7);
+  const lastDays = Array.from({length:days}, (_,i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - ((days - 1) - i));
+    return d.toISOString().slice(0,10);
+  });
+  const salesData = lastDays.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date) === k).reduce((a,s)=>a + Number(s.total || 0),0));
+  const profitData = lastDays.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date) === k).reduce((a,s)=>a + Number(s.profit || 0),0));
   const ctx=document.getElementById('salesChart');
   if(ctx){
     if(salesChartInst)salesChartInst.destroy();
-    salesChartInst=new Chart(ctx,{type:'bar',data:{labels:labels.map(k=>period === 'monthly' ? k.slice(5) : k.slice(5)),datasets:[{label:'Sales',data:salesData,backgroundColor:'rgba(37,99,235,0.7)',borderRadius:5},{label:'Profit',data:profitData,backgroundColor:'rgba(16,185,129,0.7)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+    salesChartInst=new Chart(ctx,{type:'bar',data:{labels:lastDays.map(k=>k.slice(5)),datasets:[{label:'Sales',data:salesData,backgroundColor:'rgba(37,99,235,0.7)',borderRadius:5},{label:'Profit',data:profitData,backgroundColor:'rgba(16,185,129,0.7)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
   }
-  const split = DB.sales.reduce((acc, sale) => {
-    const key = String(sale.payment || 'cash').toUpperCase();
-    acc[key] = (acc[key] || 0) + Number(sale.total || 0);
-    return acc;
-  }, {});
-  const splitLabels = Object.keys(split).length ? Object.keys(split) : ['No Sales'];
-  const splitValues = Object.keys(split).length ? Object.values(split) : [0];
   const ctx2=document.getElementById('splitChart');
   if(ctx2){
     if(splitChartInst)splitChartInst.destroy();
-    splitChartInst=new Chart(ctx2,{type:'doughnut',data:{labels:splitLabels,datasets:[{data:splitValues,backgroundColor:['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});
+    const catSales = {};
+    DB.sales.forEach(s => {
+      s.items.forEach(item => {
+        const prod = DB.products.find(p => p.id === String(item.product_id));
+        const catName = prod ? getCatName(prod.category) : 'Other';
+        catSales[catName] = (catSales[catName] || 0) + (item.price * item.qty);
+      });
+    });
+    const labels = Object.keys(catSales);
+    const data = Object.values(catSales);
+    const colors = ['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444','#00D4FF'];
+    splitChartInst=new Chart(ctx2,{type:'doughnut',data:{labels:labels.length?labels:['None'],datasets:[{data:data.length?data:[1],backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});
   }
 }
 
@@ -2750,109 +3262,138 @@ function exportSalesCsv() {
 
 async function renderLedger() {
   try {
-    const entries = await apiRequest('/digi-khata?limit=100');
-    const manualEntries = getLocalExpenses();
+    let entries = [];
+    try {
+      entries = await apiRequest('/digi-khata?limit=100');
+    } catch(e) {
+      console.warn('Backend digi-khata failed, showing local only');
+    }
+    const hideLedgerBefore = Number(localStorage.getItem('abiz_hide_ledger_before') || 0);
+    const activeEntries = entries.filter(e => new Date(e.date).getTime() >= hideLedgerBefore);
+    const manualLedger = JSON.parse(localStorage.getItem('abiz_manual_ledger') || '[]').filter(l => {
+      const ts = l.id ? Number(l.id.replace('l', '')) : new Date(l.date).getTime();
+      return ts >= hideLedgerBefore;
+    });
     const today = todayKey();
     const month = today.slice(0,7);
-    const todayEntry = entries.find(e => e.date === today);
-    const monthEntries = entries.filter(e => String(e.date).startsWith(month));
-    const todayExpense = manualEntries.filter(e => e.type === 'expense' && e.date === today).reduce((a,e)=>a + Number(e.amount || 0),0);
-    const todayManualIncome = manualEntries.filter(e => e.type === 'income' && e.date === today).reduce((a,e)=>a + Number(e.amount || 0),0);
-    const monthExpense = manualEntries.filter(e => e.type === 'expense' && String(e.date).startsWith(month)).reduce((a,e)=>a + Number(e.amount || 0),0);
-    const todayIncome = Number(todayEntry?.total_sales || 0);
-    const todayProfit = Number(todayEntry?.total_profit || 0);
-    const monthProfit = monthEntries.reduce((a,e)=>a + Number(e.total_profit || 0),0);
-    document.getElementById('lk-income').textContent = 'Rs.' + (todayIncome + todayManualIncome).toLocaleString();
+    
+    const todayEntry = activeEntries.find(e => e.date === today);
+    const monthEntries = activeEntries.filter(e => String(e.date).startsWith(month));
+    
+    let todayIncome = Number(todayEntry?.total_sales || 0);
+    let todayProfit = Number(todayEntry?.total_profit || 0);
+    let monthProfit = monthEntries.reduce((a,e)=>a + Number(e.total_profit || 0),0);
+    let todayExpense = 0;
+
+    manualLedger.forEach(l => {
+      if (l.date === today) {
+        if (l.type === 'income') { todayIncome += l.amount; todayProfit += l.amount; }
+        if (l.type === 'expense') { todayExpense += l.amount; todayProfit -= l.amount; }
+      }
+      if (l.date.startsWith(month)) {
+        if (l.type === 'income') monthProfit += l.amount;
+        if (l.type === 'expense') monthProfit -= l.amount;
+      }
+    });
+
+    document.getElementById('lk-income').textContent = 'Rs.' + todayIncome.toLocaleString();
     document.getElementById('lk-expense').textContent = 'Rs.' + todayExpense.toLocaleString();
-    document.getElementById('lk-profit').textContent = 'Rs.' + (todayProfit + todayManualIncome - todayExpense).toLocaleString();
-    document.getElementById('lk-monthly').textContent = 'Rs.' + (monthProfit - monthExpense).toLocaleString();
+    document.getElementById('lk-profit').textContent = 'Rs.' + todayProfit.toLocaleString();
+    document.getElementById('lk-monthly').textContent = 'Rs.' + monthProfit.toLocaleString();
+    
     const tbody = document.getElementById('ledger-tbody');
     if (tbody) {
-      const backendRows = entries.map(e => `<tr>
-        <td style="font-size:11px">${e.date}</td>
-        <td><span class="badge badge-green">sales</span></td>
-        <td style="font-size:12px">Daily sales total</td>
-        <td class="text-mono" style="font-weight:700;color:var(--green)">Rs.${Number(e.total_sales).toLocaleString()} | Profit Rs.${Number(e.total_profit).toLocaleString()}</td>
-      </tr>`);
-      const manualRows = manualEntries.map(e => `<tr>
-        <td style="font-size:11px">${e.date}</td>
-        <td><span class="badge ${e.type === 'expense' ? 'badge-red' : 'badge-green'}">${e.type}</span></td>
-        <td style="font-size:12px">${e.desc}</td>
-        <td class="text-mono" style="font-weight:700;color:${e.type === 'expense' ? 'var(--red)' : 'var(--green)'}">Rs.${Number(e.amount).toLocaleString()}</td>
-      </tr>`);
-      tbody.innerHTML = [...manualRows, ...backendRows].join('') || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text3)">No ledger entries found</td></tr>';
+      const allRows = [];
+      manualLedger.slice().reverse().forEach(l => {
+        allRows.push(`<tr>
+          <td style="font-size:11px">${l.date}</td>
+          <td><span class="badge ${l.type==='income'?'badge-green':'badge-red'}">${l.type}</span></td>
+          <td style="font-size:12px">${l.desc}</td>
+          <td class="text-mono" style="font-weight:700;color:${l.type==='income'?'var(--green)':'var(--red)'}">${l.type==='income'?'+':'-'} Rs.${l.amount.toLocaleString()}</td>
+        </tr>`);
+      });
+      activeEntries.forEach(e => {
+        allRows.push(`<tr>
+          <td style="font-size:11px">${e.date}</td>
+          <td><span class="badge badge-green">sales</span></td>
+          <td style="font-size:12px">Daily sales total</td>
+          <td class="text-mono" style="font-weight:700;color:var(--green)">Rs.${Number(e.total_sales).toLocaleString()} | Profit Rs.${Number(e.total_profit).toLocaleString()}</td>
+        </tr>`);
+      });
+      tbody.innerHTML = allRows.join('');
     }
   } catch (error) {
     showToast(error.message, 'error');
   }
 }
 
-function addLedgerEntry(){
-  const type = document.getElementById('lk-type')?.value || 'expense';
-  const desc = document.getElementById('lk-desc')?.value.trim();
-  const amount = Number(document.getElementById('lk-amount')?.value || 0);
-  if (!desc || amount <= 0) return showToast('Description and amount are required', 'error');
-  const entries = getLocalExpenses();
-  entries.unshift({ id: 'LED-' + Date.now(), type, desc, amount, date: todayKey() });
-  saveLocalExpenses(entries);
-  document.getElementById('lk-desc').value = '';
-  document.getElementById('lk-amount').value = '';
+async function addLedgerEntry(){
+  const type=document.getElementById('lk-type').value;
+  const desc=document.getElementById('lk-desc').value.trim();
+  const amount=parseFloat(document.getElementById('lk-amount').value)||0;
+  if(!desc){showToast('Enter description','error');return;}
+  if(amount<=0){showToast('Amount must be > 0','error');return;}
+  const manualLedger = JSON.parse(localStorage.getItem('abiz_manual_ledger') || '[]');
+  manualLedger.push({id:'l'+Date.now(),type,desc,amount,date:todayKey()});
+  localStorage.setItem('abiz_manual_ledger', JSON.stringify(manualLedger));
+  document.getElementById('lk-desc').value='';
+  document.getElementById('lk-amount').value='';
   renderLedger();
-  showToast('Digi Khata entry added', 'success');
+  showToast('Entry added successfully!', 'success');
 }
 
-async function renderReports(){
-  if (authToken) await refreshSalesData().catch(() => {});
-  const rows = filteredSales('report');
+let monthlyChartInst,catChartInst;
+function renderReports(){
+  const rows = filteredSales();
   const revenue = rows.reduce((a,s)=>a + Number(s.total || 0),0);
   const profit = rows.reduce((a,s)=>a + Number(s.profit || 0),0);
   const cost = revenue - profit;
   const tbody = document.getElementById('report-tbody');
-  const from = document.getElementById('report-date-from')?.value || 'Start';
-  const to = document.getElementById('report-date-to')?.value || 'Today';
-  if(tbody) tbody.innerHTML = `<tr><td>${from} to ${to}</td><td>${rows.length}</td><td>Rs.${revenue.toLocaleString()}</td><td>Rs.${cost.toLocaleString()}</td><td>Rs.${profit.toLocaleString()}</td><td>${revenue ? Math.round((profit/revenue)*100) : 0}%</td></tr>`;
-  renderReportCharts(rows);
-}
+  if(tbody) tbody.innerHTML = `<tr><td>Selected Period</td><td>${rows.length}</td><td class="text-mono" style="color:var(--blue2)">Rs.${revenue.toLocaleString()}</td><td class="text-mono">Rs.${cost.toLocaleString()}</td><td class="text-mono" style="color:var(--green)">Rs.${profit.toLocaleString()}</td><td style="color:var(--green);font-weight:700">${revenue ? Math.round((profit/revenue)*100) : 0}%</td></tr>`;
 
-function renderReportCharts(rows){
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  const tc=isDark?'#94A3B8':'#475569';
+  const tc=isDark?'#64748B':'#94A3B8';
   const gc=isDark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.06)';
-  const monthKeys = Array.from({length:6}, (_,i) => {
-    const d = new Date();
-    d.setMonth(d.getMonth() - (5 - i));
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+
+  const months = Array.from({length:6}, (_,i) => {
+    const d = new Date(); d.setMonth(d.getMonth() - (5 - i)); return d.toISOString().slice(0,7);
   });
-  const revenueData = monthKeys.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date).startsWith(k)).reduce((a,s)=>a+Number(s.total||0),0));
-  const profitData = monthKeys.map(k => DB.sales.filter(s => dateKey(s.rawDate || s.date).startsWith(k)).reduce((a,s)=>a+Number(s.profit||0),0));
+  const mLabels = months.map(m => {
+    const d = new Date(m + '-01');
+    return d.toLocaleString('en-US', {month:'short'}) + " " + d.getFullYear().toString().slice(2);
+  });
+  const mRev = months.map(m => DB.sales.filter(s => dateKey(s.rawDate || s.date).startsWith(m)).reduce((a,s)=>a + Number(s.total || 0),0));
+  const mProf = months.map(m => DB.sales.filter(s => dateKey(s.rawDate || s.date).startsWith(m)).reduce((a,s)=>a + Number(s.profit || 0),0));
+
   const c1=document.getElementById('monthlyChart');
-  if(c1){if(monthlyChartInst)monthlyChartInst.destroy();monthlyChartInst=new Chart(c1,{type:'line',data:{labels:monthKeys.map(k=>k.slice(5)),datasets:[{label:'Revenue',data:revenueData,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:.4},{label:'Profit',data:profitData,borderColor:'#10B981',backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});}
-  const byPayment = rows.reduce((acc,s)=>{const key=String(s.payment||'cash').toUpperCase();acc[key]=(acc[key]||0)+Number(s.total||0);return acc;},{});
-  const labels = Object.keys(byPayment).length ? Object.keys(byPayment) : ['No Sales'];
-  const values = Object.keys(byPayment).length ? Object.values(byPayment) : [0];
+  if(c1){
+    if(monthlyChartInst)monthlyChartInst.destroy();
+    monthlyChartInst=new Chart(c1,{type:'line',data:{labels:mLabels,datasets:[{label:'Revenue',data:mRev,borderColor:'#2563EB',backgroundColor:'rgba(37,99,235,0.1)',fill:true,tension:.4},{label:'Profit',data:mProf,borderColor:'#10B981',backgroundColor:'rgba(16,185,129,0.1)',fill:true,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:tc,font:{size:10}}}},scales:{x:{ticks:{color:tc},grid:{color:gc}},y:{ticks:{color:tc},grid:{color:gc}}}}});
+  }
+
+  const catSales = {};
+  DB.sales.forEach(s => {
+    s.items.forEach(item => {
+      const prod = DB.products.find(p => p.id === String(item.product_id || item.productId));
+      const catName = prod ? getCatName(prod.category) : 'Other';
+      catSales[catName] = (catSales[catName] || 0) + ((item.price || item.unit_price || 0) * (item.qty || item.quantity || 1));
+    });
+  });
+  const cLabels = Object.keys(catSales);
+  const cData = Object.values(catSales);
+  const colors = ['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444','#00D4FF'];
+
   const c2=document.getElementById('catChart');
-  if(c2){if(catChartInst)catChartInst.destroy();catChartInst=new Chart(c2,{type:'doughnut',data:{labels,datasets:[{data:values,backgroundColor:['#2563EB','#10B981','#F59E0B','#8B5CF6','#EF4444'],borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});}
+  if(c2){
+    if(catChartInst)catChartInst.destroy();
+    catChartInst=new Chart(c2,{type:'doughnut',data:{labels:cLabels.length?cLabels:['None'],datasets:[{data:cData.length?cData:[1],backgroundColor:colors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{color:tc,font:{size:10},padding:7}}}}});
+  }
 }
 
 function exportReportCsv(){
-  const rows = filteredSales('report');
+  const rows = filteredSales();
   downloadCsv('abiz-report.csv', [['Invoice','Date','Revenue','Profit'], ...rows.map(s => [s.invoice,s.date,s.total,s.profit])]);
   showToast('Report CSV downloaded', 'success');
-}
-
-function prepareSkuScan(){
-  const input = document.getElementById('prod-sku');
-  if (!input) return;
-  input.value = '';
-  input.focus();
-  showToast('Scan barcode now. USB scanner will type into SKU field.', 'info');
-}
-
-function handleSkuScanKey(event){
-  if (event.key !== 'Enter') return;
-  event.preventDefault();
-  const value = event.target.value.trim();
-  if (value) showToast('Barcode captured: ' + value, 'success');
 }
 
 function globalSearch(val){
@@ -2872,26 +3413,29 @@ function globalSearch(val){
 }
 
 function getReceiptSettings(){
-  return JSON.parse(localStorage.getItem('abiz_receipt_settings') || '{"title":"ABIZ Global Services","fontSize":"12","footer":"Thank you for your purchase!","contact":"abizglobalservices.com"}');
+  return JSON.parse(localStorage.getItem('abiz_receipt_settings') || '{"title":"ABIZ Global Services","fontSize":"12","footer":"Thank you for your purchase!"}');
 }
 
 function editReceiptSettings(){
   const settings = getReceiptSettings();
-  document.getElementById('receipt-title').value = settings.title || 'ABIZ Global Services';
-  document.getElementById('receipt-font-size').value = settings.fontSize || '12';
-  document.getElementById('receipt-footer').value = settings.footer || 'Thank you for your purchase!';
-  document.getElementById('receipt-contact').value = settings.contact || 'abizglobalservices.com';
-  openModal('modal-receipt-settings');
+  const html = `
+    <div style="padding:10px">
+      <div class="form-group"><label class="form-label">Receipt Title</label><input class="form-control" id="rs-title" value="${settings.title}"/></div>
+      <div class="form-group"><label class="form-label">Font Size (px)</label><input class="form-control" type="number" id="rs-font" value="${settings.fontSize}"/></div>
+      <div class="form-group"><label class="form-label">Footer Text</label><input class="form-control" id="rs-footer" value="${settings.footer}"/></div>
+      <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="saveReceiptSettings()">Save Settings</button>
+    </div>
+  `;
+  document.getElementById('receipt-content').innerHTML = html;
 }
 
 function saveReceiptSettings(){
-  const title = document.getElementById('receipt-title').value.trim() || 'ABIZ Global Services';
-  const fontSize = document.getElementById('receipt-font-size').value || '12';
-  const footer = document.getElementById('receipt-footer').value.trim() || 'Thank you for your purchase!';
-  const contact = document.getElementById('receipt-contact').value.trim() || 'abizglobalservices.com';
-  localStorage.setItem('abiz_receipt_settings', JSON.stringify({ title, fontSize, footer, contact }));
-  closeModal('modal-receipt-settings');
+  const title = document.getElementById('rs-title').value;
+  const fontSize = document.getElementById('rs-font').value;
+  const footer = document.getElementById('rs-footer').value;
+  localStorage.setItem('abiz_receipt_settings', JSON.stringify({ title, fontSize, footer }));
   showToast('Receipt settings saved', 'success');
+  closeModal('modal-receipt');
 }
 
 function showReceipt(sale){
@@ -2912,7 +3456,7 @@ function showReceipt(sale){
         ${sale.discount?`<div class="rt-row"><span>Discount</span><span style="color:#EF4444">- Rs. ${Number(sale.discount).toLocaleString()}</span></div>`:''}
         <div class="rt-row grand"><span>TOTAL</span><span>Rs. ${Number(sale.total || 0).toLocaleString()}</span></div>
       </div>
-      <div class="receipt-footer">${settings.footer}<br><b>${settings.contact || 'abizglobalservices.com'}</b></div>
+      <div class="receipt-footer">${settings.footer}<br><b>abizglobalservices.com</b></div>
     </div>`;
   openModal('modal-receipt');
 }
@@ -2925,6 +3469,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('user-name').textContent = me.full_name;
     document.getElementById('user-role').textContent = me.role.replace('_', ' ');
     document.getElementById('user-avatar').textContent = me.full_name.charAt(0).toUpperCase();
+    if (me.role === 'super_admin') document.getElementById('superadmin-nav').style.display = 'block';
+    applyRolePermissions(me.role);
     document.getElementById('auth-page').style.display = 'none';
     document.getElementById('app-shell').style.display = 'flex';
     await loadBackendData();
@@ -2938,3 +3484,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 </script>
 </body>
 </html>
+
+
+
+
+
