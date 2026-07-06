@@ -19,6 +19,11 @@ def get_license_key_by_id(db: Session, license_id: int) -> LicenseKey | None:
     return db.get(LicenseKey, license_id)
 
 
+def get_license_key_by_value(db: Session, license_key_value: str) -> LicenseKey | None:
+    statement = select(LicenseKey).where(LicenseKey.license_key == license_key_value)
+    return db.scalar(statement)
+
+
 def create_license_key(db: Session, assigned_to: str | None = None) -> LicenseKey:
     license_key = LicenseKey(
         license_key=generate_license_key_value(),

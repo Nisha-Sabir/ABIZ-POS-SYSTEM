@@ -2802,6 +2802,8 @@ async function restoreBackup() {
 
 let modalHtml5QrCode = null;
 async function startModalScanner() {
+  if (typeof stopCameraScanner === 'function') stopCameraScanner();
+  
   const container = document.getElementById('modal-scanner-container');
   if (container) container.style.display = 'block';
   
@@ -2814,7 +2816,7 @@ async function startModalScanner() {
         (decodedText) => {
           document.getElementById('prod-sku').value = decodedText;
           showToast('Barcode scanned!', 'success');
-          stopModalScanner();
+          setTimeout(() => stopModalScanner(), 500);
         },
         () => {}
       );
