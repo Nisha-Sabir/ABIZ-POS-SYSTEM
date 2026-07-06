@@ -1,6 +1,5 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge } = require('electron');
 
 contextBridge.exposeInMainWorld('abizDesktop', {
-  storage: true,
-  apiRequest: (request) => ipcRenderer.invoke('api:request', request)
+  storage: true
 });

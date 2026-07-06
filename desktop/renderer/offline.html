@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ABIZ POS Offline Terminal</title>
   <link rel="stylesheet" href="styles.css">
+  <script src="../frontend/html5-qrcode.min.js"></script>
 </head>
 <body class="offline-body">
   <main class="offline-shell">
@@ -58,8 +59,18 @@
         <section class="panel scanner-panel">
           <div class="panel-head">
             <h2>Scanner</h2>
-            <span>USB keyboard scanner</span>
+            <span>USB & Camera</span>
           </div>
+          
+          <div id="camera-container" style="display:none; width: 100%; margin: 10px 0; border-radius: 8px; overflow: hidden; border: 2px dashed #2563EB; background: #f8fafc;">
+            <div id="scanner-reader" style="width: 100%;"></div>
+          </div>
+          
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <button id="btn-start-camera" onclick="startCameraScanner()" style="flex:1; padding: 6px; font-size:11px;">📷 Camera</button>
+            <button id="btn-stop-camera" class="secondary" onclick="stopCameraScanner()" style="display:none; flex:1; padding: 6px; font-size:11px;">Stop Camera</button>
+          </div>
+          
           <input id="scanner-input" autocomplete="off" placeholder="Scan QR/barcode here">
           <div id="product-result" class="result">Keep cursor in this field and scan.</div>
         </section>

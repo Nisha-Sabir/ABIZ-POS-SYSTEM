@@ -10,6 +10,7 @@ class ProductCreate(BaseModel):
     purchase_price: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     sale_price: Decimal = Field(gt=0, max_digits=12, decimal_places=2)
     stock_quantity: int = Field(ge=0)
+    low_stock_threshold: int = Field(default=10, ge=0)
     category_id: int = Field(gt=0)
 
     @field_validator("name", "qr_code")
@@ -30,6 +31,7 @@ class ProductUpdate(BaseModel):
     purchase_price: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     sale_price: Decimal | None = Field(default=None, gt=0, max_digits=12, decimal_places=2)
     stock_quantity: int | None = Field(default=None, ge=0)
+    low_stock_threshold: int | None = Field(default=None, ge=0)
     category_id: int | None = Field(default=None, gt=0)
 
     @field_validator("name", "qr_code")
@@ -45,6 +47,7 @@ class ProductResponse(BaseModel):
     purchase_price: Decimal
     sale_price: Decimal
     stock_quantity: int
+    low_stock_threshold: int
     category_id: int | None
     created_at: datetime
 

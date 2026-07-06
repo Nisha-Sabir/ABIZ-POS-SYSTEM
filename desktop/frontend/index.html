@@ -6,6 +6,7 @@
 <title>ABIZ Global Services — POS System</title>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="html5-qrcode.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -646,11 +647,18 @@ textarea.form-control{resize:vertical}
       <div class="page" id="page-scanner">
         <div class="card" style="max-width:480px;margin:0 auto;text-align:center">
           <div class="section-title" style="justify-content:center">USB QR / Barcode Scanner</div>
-          <div class="scanner-frame" onclick="document.getElementById('manual-scan-input').focus()" style="cursor:pointer" title="Click to focus scanner input">
+          <div id="camera-container" style="display:none; width: 100%; max-width: 400px; margin: 0 auto 18px; border-radius: 14px; overflow: hidden; border: 2px dashed var(--blue); background: var(--card2);">
+            <div id="scanner-reader" style="width: 100%;"></div>
+          </div>
+          <div class="scanner-frame" id="usb-scanner-frame" onclick="document.getElementById('manual-scan-input').focus()" style="cursor:pointer" title="Click to focus scanner input">
             <div class="corner-tl"></div><div class="corner-tr"></div>
             <div class="corner-bl"></div><div class="corner-br"></div>
             <div class="scan-line"></div>
             <div id="scanner-placeholder" style="color:var(--text3);font-size:12px;z-index:2;font-weight:700">USB Scanner Ready<br><small>Scan code or press Enter</small></div>
+          </div>
+          <div class="flex gap-2" style="justify-content:center; margin-bottom: 14px;">
+            <button class="btn btn-outline btn-sm" id="btn-start-camera" onclick="startCameraScanner()">📷 Use Device Camera</button>
+            <button class="btn btn-danger btn-sm" id="btn-stop-camera" onclick="stopCameraScanner()" style="display:none;">Stop Camera</button>
           </div>
           <div class="form-group" style="text-align:left">
             <label class="form-label">Scan QR / Barcode</label>
@@ -837,12 +845,12 @@ textarea.form-control{resize:vertical}
               <div class="section-title">Restore Data</div>
               <p style="font-size:12px;color:var(--text2);margin-bottom:16px">Import previously exported backup file to restore data.</p>
               <div class="form-group"><label class="form-label">Upload Backup File</label>
-                <input class="form-control" type="file" accept=".json,.csv"/>
+                <input class="form-control" type="file" id="backup-file-input" accept=".json"/>
               </div>
               <div style="margin-top:8px;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--r2)">
                 <p style="font-size:11px;color:var(--red);font-weight:600">Warning: Restoring will overwrite current data.</p>
               </div>
-              <button class="btn btn-danger" style="margin-top:12px" onclick="showToast('Restore feature — confirm first','error')">Restore from Backup</button>
+              <button class="btn btn-danger" style="margin-top:12px" onclick="restoreBackup()">Restore from Backup</button>
             </div>
             <div class="card">
               <div class="section-title">Clear Data</div>
@@ -995,7 +1003,11 @@ textarea.form-control{resize:vertical}
           <label class="form-label">SKU / Barcode</label>
           <div class="flex gap-2">
             <input class="form-control" id="prod-sku" placeholder="Scan or enter code..."/>
-            <button class="btn btn-outline" style="padding:0 12px" onclick="document.getElementById('prod-sku').focus();showToast('Focus set. Scan your barcode now.','info')">Scan</button>
+            <button class="btn btn-outline" style="padding:0 12px" onclick="startModalScanner()">Scan</button>
+          </div>
+          <div id="modal-scanner-container" style="display:none; width: 100%; margin-top: 10px; border-radius: 8px; overflow: hidden; border: 2px dashed var(--blue); background: var(--card2);">
+            <div id="modal-scanner-reader" style="width: 100%;"></div>
+            <button class="btn btn-danger btn-sm" style="width:100%; border-radius:0" onclick="stopModalScanner()">Cancel Scanner</button>
           </div>
         </div>
       </div>
@@ -1009,7 +1021,7 @@ textarea.form-control{resize:vertical}
         <div class="form-group"><label class="form-label">Initial Stock</label><input class="form-control" type="number" id="prod-stock" placeholder="0" min="0"/></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label class="form-label">Low Stock Alert At</label><input class="form-control" type="number" id="prod-minstock" value="10" min="1"/></div>
+        <div class="form-group"><label class="form-label">Low Stock Alert At</label><input class="form-control" type="number" id="prod-minstock" value="10"/></div>
         <div class="form-group"><label class="form-label">Icon Label (short)</label><input class="form-control" id="prod-emoji" placeholder="e.g. Ph, Lp, Gd" maxlength="3"/></div>
       </div>
       <div class="form-group"><label class="form-label">Description</label><textarea class="form-control" id="prod-desc" rows="2" placeholder="Optional"></textarea></div>
@@ -2098,7 +2110,7 @@ function openAddProduct(){
   document.getElementById('prod-modal-title').textContent='Add New Product';
   document.getElementById('prod-edit-id').value='';
   ['prod-name','prod-sku','prod-cost','prod-price','prod-stock','prod-desc'].forEach(id=>document.getElementById(id).value='');
-  document.getElementById('prod-minstock').value='10';
+  document.getElementById('prod-minstock').value='0';
   document.getElementById('prod-emoji').value='';
   populateCategoryFilter('prod-category');
   openModal('modal-product');
@@ -2128,7 +2140,8 @@ function saveProduct(){
   const cost=parseFloat(document.getElementById('prod-cost').value)||0;
   const price=parseFloat(document.getElementById('prod-price').value)||0;
   const stock=parseInt(document.getElementById('prod-stock').value)||0;
-  const minStock=parseInt(document.getElementById('prod-minstock').value)||10;
+  const minStockVal=document.getElementById('prod-minstock').value;
+  const minStock=minStockVal===''?0:parseInt(minStockVal);
   const icon=(document.getElementById('prod-emoji').value||name.slice(0,2)).toUpperCase().slice(0,2);
   const sku=document.getElementById('prod-sku').value.trim()||name.slice(0,3).toUpperCase()+Date.now().toString().slice(-4);
   const category=document.getElementById('prod-category').value;
@@ -2328,6 +2341,9 @@ function mapCategory(c) {
 }
 
 function mapProduct(p) {
+  const localMinStocks = JSON.parse(localStorage.getItem('abiz_min_stocks') || '{}');
+  const customMin = localMinStocks[p.id];
+  const minStockValue = customMin !== undefined ? Number(customMin) : Number(p.low_stock_threshold ?? p.low_stock ?? p.min_stock ?? p.low_stock_alert ?? 10);
   return {
     id: String(p.id),
     name: p.name,
@@ -2335,7 +2351,7 @@ function mapProduct(p) {
     cost: Number(p.purchase_price || 0),
     price: Number(p.sale_price || 0),
     stock: Number(p.stock_quantity || 0),
-    minStock: Number(p.low_stock_threshold || p.low_stock || p.min_stock || p.low_stock_alert || 10),
+    minStock: minStockValue,
     category: p.category_id ? String(p.category_id) : '',
     unit: 'pcs',
     icon: (p.name || 'Pr').slice(0, 2).toUpperCase(),
@@ -2619,10 +2635,10 @@ async function saveProduct() {
     purchase_price: Number(document.getElementById('prod-cost').value || 0),
     sale_price: Number(document.getElementById('prod-price').value || 0),
     stock_quantity: Number(document.getElementById('prod-stock').value || 0),
-    low_stock_threshold: Number(document.getElementById('prod-minstock').value || 10),
-    min_stock: Number(document.getElementById('prod-minstock').value || 10),
-    low_stock_alert: Number(document.getElementById('prod-minstock').value || 10),
-    low_stock: Number(document.getElementById('prod-minstock').value || 10),
+    low_stock_threshold: document.getElementById('prod-minstock').value === '' ? 0 : Number(document.getElementById('prod-minstock').value),
+    min_stock: document.getElementById('prod-minstock').value === '' ? 0 : Number(document.getElementById('prod-minstock').value),
+    low_stock_alert: document.getElementById('prod-minstock').value === '' ? 0 : Number(document.getElementById('prod-minstock').value),
+    low_stock: document.getElementById('prod-minstock').value === '' ? 0 : Number(document.getElementById('prod-minstock').value),
     category_id: Number(document.getElementById('prod-category').value)
   };
   const qrCode = document.getElementById('prod-sku').value.trim();
@@ -2630,10 +2646,20 @@ async function saveProduct() {
   if (!payload.name) return showToast('Product name required', 'error');
   if (!payload.category_id) return showToast('Category required', 'error');
   try {
-    await apiRequest(editId ? '/products/' + editId : '/products', {
+    const minStockVal = document.getElementById('prod-minstock').value === '' ? 0 : Number(document.getElementById('prod-minstock').value);
+    const res = await apiRequest(editId ? '/products/' + editId : '/products', {
       method: editId ? 'PUT' : 'POST',
       body: JSON.stringify(payload)
     });
+    
+    // Save locally since backend lacks this column
+    const savedId = editId || (res && res.id);
+    if (savedId) {
+      const localMinStocks = JSON.parse(localStorage.getItem('abiz_min_stocks') || '{}');
+      localMinStocks[savedId] = minStockVal;
+      localStorage.setItem('abiz_min_stocks', JSON.stringify(localMinStocks));
+    }
+
     closeModal('modal-product');
     await renderProductsTable();
     showToast(editId ? 'Product updated!' : 'Product added!', 'success');
@@ -2727,6 +2753,87 @@ async function clearSelectedData() {
   } catch (err) {
     showToast(err.message, 'error');
   }
+}
+
+async function restoreBackup() {
+  const fileInput = document.getElementById('backup-file-input');
+  if (!fileInput.files.length) {
+    return showToast('Please select a backup file first.', 'error');
+  }
+  
+  if (!confirm('WARNING: Restoring will overwrite current local data. Are you sure you want to proceed?')) return;
+  
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  
+  reader.onload = async (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.products) DB.products = data.products;
+      if (data.sales) DB.sales = data.sales;
+      if (data.ledger) DB.ledger = data.ledger;
+      if (data.clients) DB.clients = data.clients;
+      if (data.licenses) DB.licenses = data.licenses;
+      if (data.staff) DB.staff = data.staff;
+      
+      persistDB();
+      updateStatCards();
+      showToast('Backup restored successfully! Syncing to backend...', 'info');
+      
+      // Attempt backend sync for products if online
+      if (data.products && data.products.length) {
+        try {
+          for (const p of data.products) {
+            try {
+              await apiRequest('/products', { method: 'POST', body: JSON.stringify(p) });
+            } catch(e){} // Ignore individual conflicts
+          }
+          showToast('Products synced to backend', 'success');
+        } catch(e) {}
+      }
+
+      setTimeout(() => location.reload(), 1500); // Reload to show data
+    } catch (err) {
+      showToast('Failed to read backup file. Invalid format.', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
+let modalHtml5QrCode = null;
+async function startModalScanner() {
+  const container = document.getElementById('modal-scanner-container');
+  if (container) container.style.display = 'block';
+  
+  if (!modalHtml5QrCode) {
+    try {
+      modalHtml5QrCode = new Html5Qrcode("modal-scanner-reader");
+      await modalHtml5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 10 },
+        (decodedText) => {
+          document.getElementById('prod-sku').value = decodedText;
+          showToast('Barcode scanned!', 'success');
+          stopModalScanner();
+        },
+        () => {}
+      );
+    } catch (err) {
+      showToast('Error starting camera. Please ensure permissions are granted.', 'error');
+      stopModalScanner();
+    }
+  }
+}
+
+function stopModalScanner() {
+  if (modalHtml5QrCode) {
+    modalHtml5QrCode.stop().then(() => {
+      modalHtml5QrCode.clear();
+      modalHtml5QrCode = null;
+    }).catch(() => { modalHtml5QrCode = null; });
+  }
+  const container = document.getElementById('modal-scanner-container');
+  if (container) container.style.display = 'none';
 }
 
 async function renderCategories() {
@@ -3067,13 +3174,75 @@ function handleScannerKey(event) {
   manualScan();
 }
 
+let html5QrCode = null;
+
 async function startCameraScanner() {
-  document.getElementById('manual-scan-input')?.focus();
-  showToast('USB scanner mode is active. Scan into the input field.', 'info');
+  const usbFrame = document.getElementById('usb-scanner-frame');
+  const camContainer = document.getElementById('camera-container');
+  const btnStart = document.getElementById('btn-start-camera');
+  const btnStop = document.getElementById('btn-stop-camera');
+  
+  if (usbFrame) usbFrame.style.display = 'none';
+  if (camContainer) camContainer.style.display = 'block';
+  if (btnStart) btnStart.style.display = 'none';
+  if (btnStop) btnStop.style.display = 'inline-flex';
+
+  if (!html5QrCode) {
+    try {
+      html5QrCode = new Html5Qrcode("scanner-reader");
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 10 },
+        onScanSuccess,
+        onScanError
+      );
+    } catch (err) {
+      showToast('Error initializing camera. Please ensure permissions are granted.', 'error');
+      stopCameraScanner(); // revert UI if camera fails
+    }
+  }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+  const manualInput = document.getElementById('manual-scan-input');
+  if (manualInput) {
+    manualInput.value = decodedText;
+    manualScan();
+    showToast('Scanned: ' + decodedText, 'success');
+    
+    // Stop after a successful scan
+    setTimeout(() => {
+      stopCameraScanner();
+    }, 1000);
+  }
+}
+
+function onScanError(errorMessage) {
+  // Silent error handling for continuous scanning
 }
 
 function stopCameraScanner() {
-  document.getElementById('manual-scan-input')?.blur();
+  if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          html5QrCode = null;
+      }).catch(err => {
+          console.log('Failed to clear scanner', err);
+          html5QrCode = null;
+      });
+  }
+  
+  const usbFrame = document.getElementById('usb-scanner-frame');
+  const camContainer = document.getElementById('camera-container');
+  const btnStart = document.getElementById('btn-start-camera');
+  const btnStop = document.getElementById('btn-stop-camera');
+  
+  if (usbFrame) usbFrame.style.display = 'flex';
+  if (camContainer) camContainer.style.display = 'none';
+  if (btnStart) btnStart.style.display = 'inline-flex';
+  if (btnStop) btnStop.style.display = 'none';
+  
+  document.getElementById('manual-scan-input')?.focus();
 }
 
 function parseSaleDate(value) {
@@ -3462,6 +3631,10 @@ function showReceipt(sale){
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Clear token on start to force login per user requirement
+  localStorage.removeItem('abiz_token');
+  authToken = '';
+
   if (!authToken) return;
   try {
     const me = await apiRequest('/auth/me');

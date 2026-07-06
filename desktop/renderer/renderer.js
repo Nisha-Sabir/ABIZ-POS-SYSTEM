@@ -299,7 +299,13 @@ async function logout() {
 }
 
 async function scanProduct(code) {
-  const product = state.products.find((item) => item.qr_code === code || item.id === code || String(item.id) === code);
+  const lowerCode = String(code).trim().toLowerCase();
+  const product = state.products.find((item) => 
+    String(item.qr_code || '').toLowerCase() === lowerCode || 
+    String(item.sku || '').toLowerCase() === lowerCode ||
+    String(item.id) === code || 
+    (item.name || '').toLowerCase().includes(lowerCode)
+  );
   if (!product) {
     $('product-result').textContent = 'Product not found in local database.';
     await setStatus('Product not found. Sync products first.', false);
@@ -311,6 +317,63 @@ async function scanProduct(code) {
   $('product-result').textContent = `${product.name} added. Price: ${money(product.sale_price)}`;
   renderCart();
   await setStatus('Item added from USB scanner.');
+}
+
+let html5QrCode = null;
+
+async function startCameraScanner() {
+  const camContainer = document.getElementById('camera-container');
+  const btnStart = document.getElementById('btn-start-camera');
+  const btnStop = document.getElementById('btn-stop-camera');
+  
+  if (camContainer) camContainer.style.display = 'block';
+  if (btnStart) btnStart.style.display = 'none';
+  if (btnStop) btnStop.style.display = 'inline-block';
+
+  if (!html5QrCode) {
+    try {
+      html5QrCode = new Html5Qrcode("scanner-reader");
+      await html5QrCode.start(
+        { facingMode: "environment" }, 
+        { fps: 10 },
+        (decodedText, decodedResult) => {
+          const manualInput = document.getElementById('scanner-input');
+          if (manualInput) {
+            manualInput.value = decodedText;
+            scanProduct(decodedText);
+            
+            // Auto stop camera after 1s
+            setTimeout(() => stopCameraScanner(), 1000);
+          }
+        },
+        (errorMessage) => { /* quiet */ }
+      );
+    } catch (err) {
+      await setStatus('Error starting camera. Permissions granted?', false);
+      stopCameraScanner();
+    }
+  }
+}
+
+function stopCameraScanner() {
+  if (html5QrCode) {
+      html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          html5QrCode = null;
+      }).catch(err => {
+          html5QrCode = null;
+      });
+  }
+  
+  const camContainer = document.getElementById('camera-container');
+  const btnStart = document.getElementById('btn-start-camera');
+  const btnStop = document.getElementById('btn-stop-camera');
+  
+  if (camContainer) camContainer.style.display = 'none';
+  if (btnStart) btnStart.style.display = 'inline-block';
+  if (btnStop) btnStop.style.display = 'none';
+  
+  document.getElementById('scanner-input')?.focus();
 }
 
 async function syncProducts() {
@@ -459,6 +522,9 @@ async function loadSettings() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Clear session to force login per user request
+  sessionStorage.removeItem('pos_session_active');
+  
   $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
   $('login-email').value = await localDb.getSetting('login_email');
   $('scanner-input').addEventListener('keydown', async (event) => {

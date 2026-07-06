@@ -16,6 +16,7 @@ class Product(Base):
     purchase_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     sale_price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     stock_quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    low_stock_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
     category_id: Mapped[int] = mapped_column(
         ForeignKey("categories.id", ondelete="SET NULL"),
         nullable=True,
