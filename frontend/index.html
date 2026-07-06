@@ -2251,9 +2251,12 @@ function saveClient(){
   const chars='abcdefghijklmnopqrstuvwxyz0123456789';
   const seg=()=>Array.from({length:4},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
   const key=biz.slice(0,2).toLowerCase()+'-'+seg()+'-'+seg()+'-'+seg();
-  DB.clients.push({id:'cl'+Date.now(),biz,contact:document.getElementById('cl-contact').value,email:document.getElementById('cl-email').value,phone:document.getElementById('cl-phone').value,plan:document.getElementById('cl-plan').value,key,expiry:'2025-12-31',active:true});
+  const expiry='2025-12-31';
+  const plan=document.getElementById('cl-plan').value;
+  DB.clients.push({id:'cl'+Date.now(),biz,contact:document.getElementById('cl-contact').value,email:document.getElementById('cl-email').value,phone:document.getElementById('cl-phone').value,plan,key,expiry,active:true});
+  DB.licenses.push({id:'lic'+Date.now(),key,client:biz,plan,issued:new Date().toISOString().slice(0,10),expiry,status:'active'});
   persistDB();
-  closeModal('modal-client');renderClients();renderSuperAdmin();
+  closeModal('modal-client');renderClients();renderSuperAdmin();renderLicenses();
   showToast('Client added! Key: '+key,'success');
 }
 
