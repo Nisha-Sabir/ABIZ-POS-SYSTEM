@@ -2711,10 +2711,7 @@ function doLogout() {
   localStorage.removeItem('abiz_token');
   localStorage.removeItem('abiz_offline_hash');
   localStorage.removeItem('abiz_offline_email');
-  localStorage.removeItem('abiz_mock_db');
   DB.user = null;
-  DB.staff = [];
-  DB.clients = [];
   cart = [];
   const oldBanner = document.getElementById('sub-banner');
   if(oldBanner) oldBanner.remove();
