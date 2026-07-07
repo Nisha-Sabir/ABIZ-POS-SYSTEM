@@ -122,11 +122,11 @@ def sync_offline_sale_batch(
 @router.get("", response_model=list[SaleResponse])
 def read_sales(
     db: Annotated[Session, Depends(get_db)],
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
 ) -> list[SaleResponse]:
-    return get_sales(db, skip=skip, limit=limit)
+    return get_sales(db, skip=skip, limit=limit, current_user=current_user)
 
 
 @router.get("/{sale_id}", response_model=SaleResponse)

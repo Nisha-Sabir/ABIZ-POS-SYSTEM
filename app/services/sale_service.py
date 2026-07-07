@@ -8,13 +8,20 @@ from app.models.cart_item import CartItem
 from app.models.product import Product
 from app.models.sale import Sale
 from app.models.sale_item import SaleItem
+from app.models.user import UserRole
 from app.schemas.sale import OfflineSaleCreate, OfflineSyncResult
 from app.services.cart_service import clear_user_cart, get_user_cart_items
 from app.services.digi_khata_service import update_daily_digi_khata
 
 
-def get_sales(db: Session, skip: int = 0, limit: int = 100) -> list[Sale]:
-    statement = select(Sale).order_by(Sale.created_at.desc(), Sale.id.desc()).offset(skip).limit(limit)
+def get_sales(db: Session, skip: int = 0, limit: int = 100, current_user=None) -> list[Sale]:
+    statement = select(Sale).order_by(Sale.created_at.desc(), Sale.id.desc())
+
+    # Data isolation: admin sees only their own sales, super_admin sees all
+    if current_user and current_user.role == UserRole.ADMIN:
+        statement = statement.where(Sale.created_by_id == current_user.id)
+
+    statement = statement.offset(skip).limit(limit)
     return list(db.scalars(statement).all())
 
 
@@ -59,7 +66,7 @@ def checkout_cart(db: Session, user_id: int) -> Sale:
         raise ValueError(f"Insufficient stock for {unavailable_product}.")
 
     total_amount, total_profit = calculate_cart_totals(cart_items)
-    sale = Sale(total_amount=total_amount, total_profit=total_profit)
+    sale = Sale(total_amount=total_amount, total_profit=total_profit, created_by_id=user_id)
     db.add(sale)
     db.flush()
 

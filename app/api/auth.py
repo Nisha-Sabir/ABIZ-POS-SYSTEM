@@ -124,7 +124,15 @@ def forgot_password(
     token_payload = {"sub": str(user.id), "exp": expire, "type": "reset"}
     token = jwt.encode(token_payload, settings.secret_key, algorithm=settings.algorithm)
     
-    reset_link = f"https://your-domain.com/?reset_token={token}" # Frontend checks this
+    frontend_url = os.getenv("FRONTEND_URL", "").rstrip("/")
+    if not frontend_url:
+        # Auto-detect from request or fallback
+        frontend_url = os.getenv("RAILWAY_PUBLIC_DOMAIN", "")
+        if frontend_url:
+            frontend_url = f"https://{frontend_url}"
+        else:
+            frontend_url = "http://localhost:5173"
+    reset_link = f"{frontend_url}/?reset_token={token}"
     
     # Email Sending Logic
     smtp_server = os.getenv("SMTP_SERVER")

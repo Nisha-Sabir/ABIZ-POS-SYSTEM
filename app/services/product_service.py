@@ -3,6 +3,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.product import Product
+from app.models.user import UserRole
 from app.schemas.product import ProductCreate, ProductUpdate
 from app.utils.qr_code import generate_product_qr_code
 
@@ -22,8 +23,13 @@ def get_products(
     limit: int = 100,
     search: str | None = None,
     category_id: int | None = None,
+    current_user=None,
 ) -> list[Product]:
     statement = select(Product).order_by(Product.created_at.desc(), Product.id.desc())
+
+    # Data isolation: admin sees only their own products, super_admin sees all
+    if current_user and current_user.role == UserRole.ADMIN:
+        statement = statement.where(Product.owner_id == current_user.id)
 
     if search:
         statement = statement.where(Product.name.ilike(f"%{search.strip()}%"))
@@ -35,9 +41,10 @@ def get_products(
     return list(db.scalars(statement).all())
 
 
-def create_product(db: Session, product_data: ProductCreate) -> Product:
+def create_product(db: Session, product_data: ProductCreate, owner_id: int | None = None) -> Product:
     product_values = product_data.model_dump()
     product_values["qr_code"] = product_values["qr_code"] or generate_unique_product_qr_code(db)
+    product_values["owner_id"] = owner_id  # Assign owner for data isolation
     product = Product(**product_values)
     db.add(product)
 

@@ -27,7 +27,7 @@ def get_license_key_by_value(db: Session, license_key_value: str) -> LicenseKey 
 def create_license_key(db: Session, assigned_to: str | None = None) -> LicenseKey:
     license_key = LicenseKey(
         license_key=generate_license_key_value(),
-        status=LicenseStatus.INACTIVE,
+        status=LicenseStatus.ACTIVE,  # Auto-activate on creation
         assigned_to=assigned_to,
     )
     db.add(license_key)

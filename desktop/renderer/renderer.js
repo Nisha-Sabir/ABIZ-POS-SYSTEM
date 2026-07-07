@@ -108,6 +108,7 @@ async function updateAuthState() {
   if ($('backend-url')) $('backend-url').style.display = loggedIn ? 'none' : 'block';
   if ($('login-email')) $('login-email').style.display = loggedIn ? 'none' : 'block';
   if ($('login-password')) $('login-password').style.display = loggedIn ? 'none' : 'block';
+  if ($('login-license')) $('login-license').style.display = loggedIn ? 'none' : 'block';
   if ($('login-panel')) {
     const labels = $('login-panel').querySelectorAll('label');
     labels.forEach(l => l.style.display = loggedIn ? 'none' : 'block');
@@ -200,7 +201,9 @@ async function sha256(message) {
 async function login() {
   const email = $('login-email').value.trim();
   const password = $('login-password').value;
+  const licenseKey = ($('login-license')?.value || '').trim();
   if (!email || !password) throw new Error('Email and password required.');
+  if (!licenseKey) throw new Error('License Key required. Please enter your ABIZ license key.');
 
   const backendUrl = $('backend-url').value.trim();
   if (backendUrl) {
@@ -208,24 +211,15 @@ async function login() {
     localStorage.setItem('abiz_api_base', backendUrl);
   }
 
+  // Save license key for offline use
+  await localDb.setSetting('saved_license_key', licenseKey);
+
   try {
-    let token;
-    try {
-      token = await api('/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ username: email, password: password }).toString()
-      });
-    } catch (e1) {
-      if (e1.message.includes('422') || e1.message.includes('415') || e1.message.includes('400')) {
-        token = await api('/auth/login', {
-          method: 'POST',
-          body: JSON.stringify({ email, password })
-        });
-      } else {
-        throw e1;
-      }
-    }
+    // Always send JSON with license_key — backend requires it
+    const token = await api('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, license_key: licenseKey })
+    });
     await localDb.setSetting('auth_token', token.access_token || token.token || (typeof token === 'string' ? token : ''));
     sessionStorage.setItem('pos_session_active', 'true');
     await localDb.setSetting('login_email', email);
@@ -526,7 +520,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   sessionStorage.removeItem('pos_session_active');
   
   $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
-  $('login-email').value = await localDb.getSetting('login_email');
+  $('login-email').value = await localDb.getSetting('login_email') || '';
+  // License key is NOT auto-filled for security — user must enter manually each time
+
+  // Fix Electron input focus — click on login panel focuses first empty input
+  const loginPanel = $('login-panel');
+  if (loginPanel) {
+    loginPanel.addEventListener('click', () => {
+      const inputs = loginPanel.querySelectorAll('input:not([style*="display:none"])');
+      for (const inp of inputs) {
+        if (!inp.value || inp.type === 'password') { inp.focus(); break; }
+      }
+    });
+  }
   $('scanner-input').addEventListener('keydown', async (event) => {
     if (event.key !== 'Enter') return;
     const code = event.target.value.trim();

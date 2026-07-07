@@ -1,12 +1,12 @@
-from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_admin
+from app.api.dependencies import get_current_admin, get_current_user
 from app.database.session import get_db
+from app.models.user import User
 from app.schemas.product import ProductCreate, ProductResponse, ProductUpdate
 from app.schemas.qr import QRCodeResponse
 from app.services.category_service import get_category_by_id
@@ -57,6 +57,7 @@ def _validate_product_prices(
 def create_new_product(
     product_data: ProductCreate,
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ) -> ProductResponse:
     if product_data.qr_code and get_product_by_qr_code(db, product_data.qr_code):
         raise HTTPException(
@@ -67,7 +68,7 @@ def create_new_product(
     _validate_product_category(db, product_data.category_id)
 
     try:
-        return create_product(db, product_data)
+        return create_product(db, product_data, owner_id=current_user.id)
     except IntegrityError:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -78,6 +79,7 @@ def create_new_product(
 @router.get("", response_model=list[ProductResponse])
 def read_products(
     db: Annotated[Session, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
     skip: Annotated[int, Query(ge=0)] = 0,
     limit: Annotated[int, Query(ge=1, le=100)] = 100,
     search: Annotated[str | None, Query(min_length=1, max_length=255)] = None,
@@ -89,6 +91,7 @@ def read_products(
         limit=limit,
         search=search,
         category_id=category_id,
+        current_user=current_user,
     )
 
 
