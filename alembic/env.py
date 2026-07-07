@@ -1,22 +1,26 @@
-from logging.config import fileConfig
+﻿from logging.config import fileConfig
 
+import os
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import create_engine, pool
 
 from app.core.config import settings
 from app.database.base import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.sqlalchemy_database_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 
+# Always use the app settings URL (reads DATABASE_URL env var on Railway)
+def get_url() -> str:
+    return settings.sqlalchemy_database_url
+
 
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -30,10 +34,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    configuration = config.get_section(config.config_ini_section, {})
-    connectable = engine_from_config(
-        configuration,
-        prefix="sqlalchemy.",
+    connectable = create_engine(
+        get_url(),
         poolclass=pool.NullPool,
     )
 
