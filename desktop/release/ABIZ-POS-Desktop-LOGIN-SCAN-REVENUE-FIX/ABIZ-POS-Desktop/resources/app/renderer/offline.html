@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ABIZ POS Offline Terminal</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="../frontend/html5-qrcode.min.js"></script>
+</head>
+<body class="offline-body">
+  <main class="offline-shell">
+    <aside class="offline-sidebar">
+      <div class="offline-brand">
+        <div class="brand-mark">AB</div>
+        <div>
+          <h1>ABIZ POS</h1>
+          <p>Offline Sales Terminal</p>
+        </div>
+      </div>
+
+      <div class="status-card">
+        <span class="status-dot" id="connection-dot"></span>
+        <div>
+          <strong id="connection-label">Checking...</strong>
+          <small id="status">Preparing terminal</small>
+        </div>
+      </div>
+
+      <section class="side-panel" id="login-panel">
+        <h2>Login</h2>
+        <label>Backend URL</label>
+        <input id="backend-url" tabindex="0" autocomplete="off" placeholder="https://your-app.up.railway.app/api/v1" style="pointer-events:all;user-select:text;-webkit-user-select:text">
+        <label>Email</label>
+        <input id="login-email" tabindex="0" type="email" autocomplete="email" placeholder="admin@example.com" style="pointer-events:all;user-select:text;-webkit-user-select:text">
+        <label>Password</label>
+        <input id="login-password" tabindex="0" type="password" autocomplete="current-password" placeholder="Password" style="pointer-events:all;user-select:text;-webkit-user-select:text">
+        <label>License Key</label>
+        <input id="login-license" tabindex="0" autocomplete="off" spellcheck="false" placeholder="ABIZ-XXXX-XXXX-XXXX" style="pointer-events:all;user-select:text;-webkit-user-select:text;text-transform:uppercase">
+        <button id="do-login" class="wide">Login &amp; Sync</button>
+        <button id="logout-btn" class="wide secondary" style="display:none">Logout</button>
+      </section>
+
+      <section class="side-panel">
+        <h2>Sync</h2>
+        <button id="sync-products" class="wide">Sync Products</button>
+        <button id="sync-sales" class="wide secondary">Sync Sales</button>
+        <a class="link-button wide secondary" href="index.html">Online Dashboard</a>
+      </section>
+    </aside>
+
+    <section class="terminal-area locked" id="terminal-area">
+      <div class="terminal-header">
+        <div>
+          <h2>Sales Counter</h2>
+          <p>Scan USB QR/barcode, complete sale, print invoice, sync when internet is available.</p>
+        </div>
+        <div class="pending-pill" id="pending-pill">Pending: 0</div>
+      </div>
+
+      <div class="terminal-grid">
+        <section class="panel scanner-panel">
+          <div class="panel-head">
+            <h2>Scanner</h2>
+            <span>USB & Camera</span>
+          </div>
+          
+          <div id="camera-container" style="display:none; width: 100%; margin: 10px 0; border-radius: 8px; overflow: hidden; border: 2px dashed #2563EB; background: #f8fafc;">
+            <div id="scanner-reader" style="width: 100%;"></div>
+          </div>
+          
+          <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+            <button id="btn-start-camera" onclick="startCameraScanner()" style="flex:1; padding: 6px; font-size:11px;">📷 Camera</button>
+            <button id="btn-stop-camera" class="secondary" onclick="stopCameraScanner()" style="display:none; flex:1; padding: 6px; font-size:11px;">Stop Camera</button>
+          </div>
+          
+          <input id="scanner-input" autocomplete="off" placeholder="Scan QR/barcode here">
+          <div id="product-result" class="result">Keep cursor in this field and scan.</div>
+        </section>
+
+        <section class="panel cart-panel-modern">
+          <div class="panel-head">
+            <h2>Cart</h2>
+            <span id="cart-count">0 items</span>
+          </div>
+          <div id="cart-list" class="cart"></div>
+
+          <div class="checkout-grid">
+            <label>Discount
+              <input id="discount-input" type="number" min="0" value="0">
+            </label>
+            <label>Payment
+              <select id="payment-method" class="form-control">
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="easypaisa">EasyPaisa</option>
+                <option value="jazzcash">JazzCash</option>
+              </select>
+            </label>
+            <label>Amount Paid
+              <input id="amount-paid" type="number" min="0" value="0">
+            </label>
+          </div>
+
+          <div class="summary-box">
+            <div><span>Total</span><strong id="total">0.00</strong></div>
+            <div><span>Change</span><strong id="change-amount">0.00</strong></div>
+          </div>
+
+          <div class="row">
+            <button id="clear-cart" class="secondary">Clear Cart</button>
+            <button id="checkout">Save Sale & Print</button>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel products-panel">
+        <div class="panel-head">
+          <h2>Local Products</h2>
+          <span>Available offline after sync</span>
+        </div>
+        <div id="products-list" class="products"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-.env
+﻿.env
 .venv/
 __pycache__/
 *.py[cod]
@@ -10,4 +10,6 @@ dist/
 build/
 node_modules/
 postgres_data/
+*.db
+*.zip
 desktop/release/
