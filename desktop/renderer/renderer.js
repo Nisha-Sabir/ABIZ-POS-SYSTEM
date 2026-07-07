@@ -523,13 +523,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('login-email').value = await localDb.getSetting('login_email') || '';
   // License key is NOT auto-filled for security — user must enter manually each time
 
-  // Fix Electron input focus — click on login panel focuses first empty input
+  // Fix Electron input focus — only redirect focus if user clicks panel background (not on an input)
   const loginPanel = $('login-panel');
   if (loginPanel) {
-    loginPanel.addEventListener('click', () => {
+    loginPanel.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
       const inputs = loginPanel.querySelectorAll('input:not([style*="display:none"])');
       for (const inp of inputs) {
-        if (!inp.value || inp.type === 'password') { inp.focus(); break; }
+        if (!inp.value) { inp.focus(); break; }
       }
     });
   }
