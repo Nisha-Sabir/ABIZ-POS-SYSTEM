@@ -494,6 +494,11 @@ textarea.form-control{resize:vertical}
         <span class="si">&#9679;</span>
         <input placeholder="Search products, sales..." id="global-search" oninput="globalSearch(this.value)"/>
       </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+        <input id="web-api-base" placeholder="https://abiz-pos.up.railway.app/api" class="form-control" style="width:280px;font-size:12px;padding:6px 10px;height:auto;background:var(--card);border:1px solid var(--border);color:var(--text)">
+        <button id="web-save-api" class="btn btn-primary btn-sm" onclick="saveWebBackend()">Save Backend</button>
+        <button class="btn btn-outline btn-sm" style="background:#475569;color:#fff;border:none" onclick="window.location.href='/offline-pos/offline.html'">Offline POS</button>
+      </div>
       <div class="icon-btn" onclick="toggleTheme()" title="Theme">T</div>
       <div class="icon-btn" onclick="showPage('scanner')" title="Scanner">QR</div>
       <div class="icon-btn" title="Notifications" style="position:relative">N<span class="notif-dot"></span></div>
@@ -4002,8 +4007,23 @@ function deleteClient(id) {
   showToast('Client deleted', 'success');
 }
 
+function saveWebBackend() {
+  const input = document.getElementById('web-api-base');
+  if (!input) return;
+  const value = input.value.trim();
+  if (!value) return;
+  localStorage.setItem('abiz_api_base', value);
+  showToast('Backend URL saved! Reloading...', 'success');
+  setTimeout(() => window.location.reload(), 1000);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
+
+  const apiInput = document.getElementById('web-api-base');
+  if (apiInput) {
+    apiInput.value = localStorage.getItem('abiz_api_base') || 'https://abiz-pos-system-production-02e4.up.railway.app/api';
+  }
 
   // Reset Password flow — detect token in URL first
   if (urlParams.has('reset_token')) {
