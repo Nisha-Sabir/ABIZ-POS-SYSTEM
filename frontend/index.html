@@ -1377,11 +1377,13 @@ function seedData() {
     {id:'p9',name:'Lays Chips 100g',sku:'CHIPS-L',cost:50,price:90,stock:4,minStock:10,category:'cat2',unit:'pcs',icon:'Ch',desc:''},
     {id:'p10',name:'Ball Point Pen',sku:'PEN-BP',cost:15,price:35,stock:500,minStock:50,category:'cat4',unit:'pcs',icon:'Pn',desc:''},
   ];
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const invDate = todayStr.replace(/-/g, '');
   DB.sales = [
-    {id:'s1',invoice:'INV-20241201-0001',date:'2024-12-01 10:30',items:[{name:'Samsung Galaxy A54',qty:1,price:65000},{name:'USB-C Cable 1m',qty:2,price:450}],subtotal:65900,discount:0,total:65900,profit:10450,cost:55400,payment:'cash',paid:70000,change:4100,status:'completed'},
-    {id:'s2',invoice:'INV-20241201-0002',date:'2024-12-01 11:45',items:[{name:'Coca Cola 1.5L',qty:5,price:120},{name:'Lays Chips',qty:3,price:90}],subtotal:870,discount:50,total:820,profit:295,cost:525,payment:'easypaisa',paid:820,change:0,status:'completed'},
-    {id:'s3',invoice:'INV-20241201-0003',date:'2024-12-01 14:20',items:[{name:"Men's T-Shirt",qty:2,price:800}],subtotal:1600,discount:100,total:1500,profit:700,cost:800,payment:'card',paid:1500,change:0,status:'completed'},
-    {id:'s4',invoice:'INV-20241201-0004',date:'2024-12-01 16:00',items:[{name:'Notebook A4',qty:5,price:120},{name:'Ball Point Pen',qty:10,price:35}],subtotal:950,discount:0,total:950,profit:425,cost:525,payment:'cash',paid:1000,change:50,status:'completed'},
+    {id:'s1',invoice:`INV-${invDate}-0001`,date:`${todayStr} 10:30`,items:[{name:'Samsung Galaxy A54',qty:1,price:65000},{name:'USB-C Cable 1m',qty:2,price:450}],subtotal:65900,discount:0,total:65900,profit:10450,cost:55400,payment:'cash',paid:70000,change:4100,status:'completed'},
+    {id:'s2',invoice:`INV-${invDate}-0002`,date:`${todayStr} 11:45`,items:[{name:'Coca Cola 1.5L',qty:5,price:120},{name:'Lays Chips',qty:3,price:90}],subtotal:870,discount:50,total:820,profit:295,cost:525,payment:'easypaisa',paid:820,change:0,status:'completed'},
+    {id:'s3',invoice:`INV-${invDate}-0003`,date:`${todayStr} 14:20`,items:[{name:"Men's T-Shirt",qty:2,price:800}],subtotal:1600,discount:100,total:1500,profit:700,cost:800,payment:'card',paid:1500,change:0,status:'completed'},
+    {id:'s4',invoice:`INV-${invDate}-0004`,date:`${todayStr} 16:00`,items:[{name:'Notebook A4',qty:5,price:120},{name:'Ball Point Pen',qty:10,price:35}],subtotal:950,discount:0,total:950,profit:425,cost:525,payment:'cash',paid:1000,change:50,status:'completed'},
   ];
   DB.ledger = [
     {id:'l1',type:'income',desc:'Sale INV-20241201-0001',amount:65900,date:'2024-12-01'},
@@ -4048,7 +4050,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   localStorage.removeItem('abiz_token');
   authToken = '';
 
-  if (!authToken) return;
+  if (!authToken) {
+    // Migration for old dummy sales so they show up as "Today's Sales" in Super Admin
+    if (DB.sales && DB.sales.length > 0 && DB.sales[0].date && DB.sales[0].date.startsWith('2024-12-01')) {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      DB.sales.forEach(s => {
+        if (s.date) s.date = s.date.replace('2024-12-01', todayStr);
+        if (s.invoice) s.invoice = s.invoice.replace('20241201', todayStr.replace(/-/g, ''));
+      });
+      persistDB();
+    }
+    return;
+  }
   try {
     const me = await apiRequest('/auth/me');
     DB.user = { username: me.email, name: me.full_name, role: me.role };
