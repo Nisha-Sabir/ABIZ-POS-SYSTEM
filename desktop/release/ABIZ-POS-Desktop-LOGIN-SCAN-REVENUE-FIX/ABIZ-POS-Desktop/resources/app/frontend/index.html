@@ -289,11 +289,10 @@ textarea.form-control{resize:vertical}
 .receipt-footer{text-align:center;margin-top:14px;padding-top:10px;border-top:1px dashed #ddd;font-size:10px;color:#999}
 
 @media print {
-  body * { display: none !important; }
-  #modal-receipt, #modal-receipt *, #receipt-content, #receipt-content * { display: block !important; }
-  .modal-overlay { background: transparent !important; display: block !important; }
-  .modal { box-shadow: none !important; border: none !important; background: transparent !important; position: absolute; left: 0; top: 0; margin: 0; max-width: 100%; width: 100%; animation: none !important; }
-  .modal-header, .modal-footer { display: none !important; }
+  body > *:not(#modal-receipt) { display: none !important; }
+  #modal-receipt { display: flex !important; background: transparent !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; }
+  .modal { box-shadow: none !important; border: none !important; background: transparent !important; margin: 0; padding: 0; max-width: 100%; width: 100%; animation: none !important; }
+  #modal-receipt .modal-header, #modal-receipt .modal-footer { display: none !important; }
   @page { margin: 0; }
 }
 
@@ -494,6 +493,11 @@ textarea.form-control{resize:vertical}
       <div class="topbar-search">
         <span class="si">&#9679;</span>
         <input placeholder="Search products, sales..." id="global-search" oninput="globalSearch(this.value)"/>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
+        <input id="web-api-base" placeholder="https://abiz-pos.up.railway.app/api" class="form-control" style="width:280px;font-size:12px;padding:6px 10px;height:auto;background:var(--card);border:1px solid var(--border);color:var(--text)">
+        <button id="web-save-api" class="btn btn-primary btn-sm" onclick="saveWebBackend()">Save Backend</button>
+        <button class="btn btn-outline btn-sm" style="background:#475569;color:#fff;border:none" onclick="window.location.href='/offline-pos/offline.html'">Offline POS</button>
       </div>
       <div class="icon-btn" onclick="toggleTheme()" title="Theme">T</div>
       <div class="icon-btn" onclick="showPage('scanner')" title="Scanner">QR</div>
@@ -1428,6 +1432,7 @@ function doLogin() {
   }
   
   DB.user={username:u,name,role};
+  restoreDB();
   document.getElementById('user-name').textContent=name;
   document.getElementById('user-role').textContent=role.charAt(0).toUpperCase()+role.slice(1);
   document.getElementById('user-avatar').textContent=name.charAt(0);
@@ -3937,20 +3942,29 @@ async function renderSuperAdmin() {
   const grid = document.getElementById('client-cards-grid');
   if (!grid) return;
 
-  // Fetch real backend stats for Super Admin view
+  // Fetch real backend stats for Super Admin view, fallback to mock DB if offline/mocked
   let todaySales = 0, todayRevenue = 0, todayProfit = 0, totalProducts = 0;
   try {
-    const [sales, products] = await Promise.all([
-      apiRequest('/sales?limit=200').catch(() => []),
-      apiRequest('/products?limit=500').catch(() => [])
-    ]);
+    let sales = [], products = [];
+    try {
+      sales = await apiRequest('/sales?limit=200');
+      products = await apiRequest('/products?limit=500');
+    } catch(e) {
+      sales = DB.sales || [];
+      products = DB.products || [];
+    }
     totalProducts = products.length;
     const today = new Date().toISOString().slice(0, 10);
-    const todaySalesArr = sales.filter(s => (s.created_at || '').startsWith(today));
+    const todaySalesArr = sales.filter(s => {
+      let d = s.created_at || s.date || '';
+      return d.startsWith(today) || d.includes(today);
+    });
     todaySales = todaySalesArr.length;
-    todayRevenue = todaySalesArr.reduce((a, s) => a + Number(s.total_amount || 0), 0);
-    todayProfit = todaySalesArr.reduce((a, s) => a + Number(s.total_profit || 0), 0);
-  } catch(e) {}
+    todayRevenue = todaySalesArr.reduce((a, s) => a + Number(s.total_amount || s.total || 0), 0);
+    todayProfit = todaySalesArr.reduce((a, s) => a + Number(s.total_profit || s.profit || 0), 0);
+  } catch(e) {
+    console.error('Error rendering super admin stats', e);
+  }
 
   // Show stats banner
   const statsBanner = document.getElementById('superadmin-stats-banner');
@@ -4003,8 +4017,23 @@ function deleteClient(id) {
   showToast('Client deleted', 'success');
 }
 
+function saveWebBackend() {
+  const input = document.getElementById('web-api-base');
+  if (!input) return;
+  const value = input.value.trim();
+  if (!value) return;
+  localStorage.setItem('abiz_api_base', value);
+  showToast('Backend URL saved! Reloading...', 'success');
+  setTimeout(() => window.location.reload(), 1000);
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
+
+  const apiInput = document.getElementById('web-api-base');
+  if (apiInput) {
+    apiInput.value = localStorage.getItem('abiz_api_base') || 'https://abiz-pos-system-production-02e4.up.railway.app/api';
+  }
 
   // Reset Password flow — detect token in URL first
   if (urlParams.has('reset_token')) {

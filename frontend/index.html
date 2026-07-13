@@ -1432,6 +1432,7 @@ function doLogin() {
   }
   
   DB.user={username:u,name,role};
+  restoreDB();
   document.getElementById('user-name').textContent=name;
   document.getElementById('user-role').textContent=role.charAt(0).toUpperCase()+role.slice(1);
   document.getElementById('user-avatar').textContent=name.charAt(0);
@@ -3941,20 +3942,29 @@ async function renderSuperAdmin() {
   const grid = document.getElementById('client-cards-grid');
   if (!grid) return;
 
-  // Fetch real backend stats for Super Admin view
+  // Fetch real backend stats for Super Admin view, fallback to mock DB if offline/mocked
   let todaySales = 0, todayRevenue = 0, todayProfit = 0, totalProducts = 0;
   try {
-    const [sales, products] = await Promise.all([
-      apiRequest('/sales?limit=200').catch(() => []),
-      apiRequest('/products?limit=500').catch(() => [])
-    ]);
+    let sales = [], products = [];
+    try {
+      sales = await apiRequest('/sales?limit=200');
+      products = await apiRequest('/products?limit=500');
+    } catch(e) {
+      sales = DB.sales || [];
+      products = DB.products || [];
+    }
     totalProducts = products.length;
     const today = new Date().toISOString().slice(0, 10);
-    const todaySalesArr = sales.filter(s => (s.created_at || '').startsWith(today));
+    const todaySalesArr = sales.filter(s => {
+      let d = s.created_at || s.date || '';
+      return d.startsWith(today) || d.includes(today);
+    });
     todaySales = todaySalesArr.length;
-    todayRevenue = todaySalesArr.reduce((a, s) => a + Number(s.total_amount || 0), 0);
-    todayProfit = todaySalesArr.reduce((a, s) => a + Number(s.total_profit || 0), 0);
-  } catch(e) {}
+    todayRevenue = todaySalesArr.reduce((a, s) => a + Number(s.total_amount || s.total || 0), 0);
+    todayProfit = todaySalesArr.reduce((a, s) => a + Number(s.total_profit || s.profit || 0), 0);
+  } catch(e) {
+    console.error('Error rendering super admin stats', e);
+  }
 
   // Show stats banner
   const statsBanner = document.getElementById('superadmin-stats-banner');
