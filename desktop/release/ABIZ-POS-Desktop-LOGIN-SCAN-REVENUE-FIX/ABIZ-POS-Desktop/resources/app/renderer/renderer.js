@@ -159,9 +159,13 @@ async function refreshProducts() {
 async function getBackendConfig() {
   const savedUrl = await localDb.getSetting('backend_url');
   const sharedUrl = localStorage.getItem('abiz_api_base') || '';
-  if (!savedUrl && sharedUrl) await localDb.setSetting('backend_url', sharedUrl);
+  const defaultUrl = 'https://abiz-pos-system-production-02e4.up.railway.app/api';
+  
+  let finalUrl = savedUrl || sharedUrl || defaultUrl;
+  if (!savedUrl && finalUrl) await localDb.setSetting('backend_url', finalUrl);
+  
   return {
-    baseUrl: savedUrl || sharedUrl,
+    baseUrl: finalUrl,
     token: (await localDb.getSetting('auth_token')) || localStorage.getItem('abiz_token')
   };
 }
@@ -249,6 +253,10 @@ async function login() {
       return;
     }
     
+    if (error.message.includes('Backend URL missing')) {
+      throw error;
+    }
+    
     try {
       const staffDb = JSON.parse(localStorage.getItem('abiz_mock_db')) || {};
       const localStaff = (staffDb.staff || []).find(s => (s.username || '').toLowerCase() === email.toLowerCase() && s.password === password && s.status === 'active');
@@ -264,7 +272,7 @@ async function login() {
     let offlineHash = localStorage.getItem('abiz_offline_hash') || await localDb.getSetting('abiz_offline_hash');
     let offlineEmail = localStorage.getItem('abiz_offline_email') || await localDb.getSetting('abiz_offline_email');
     if (!offlineHash) {
-      throw new Error('Offline login unavailable: You must log in online at least once to enable secure offline access.');
+      throw new Error(`Online login failed: ${error.message}. (Offline login is also unavailable until you log in online once)`);
     }
     if (email !== offlineEmail) {
       throw new Error('Offline login failed: This email has not been synced for offline access.');
@@ -428,11 +436,10 @@ function printInvoice(sale, cartItems) {
       .btn-close { background: #f1f5f9; color: #333; }
       
       @media print {
-        body * { display: none !important; }
-        #offline-receipt-modal, #offline-receipt-modal * { display: block !important; }
-        #offline-receipt-modal { position: absolute; left: 0; top: 0; margin: 0; padding: 0; background: white !important; align-items: flex-start; justify-content: flex-start; }
+        body > *:not(#offline-receipt-modal) { display: none !important; }
+        #offline-receipt-modal { display: flex !important; background: white !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; align-items: flex-start; justify-content: flex-start; margin: 0; padding: 0; }
         .offline-receipt-box { box-shadow: none !important; max-width: 100%; }
-        .offline-receipt-actions { display: none !important; }
+        #offline-receipt-modal .offline-receipt-actions { display: none !important; }
         @page { margin: 0; }
       }
     `;
@@ -519,7 +526,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Clear session to force login per user request
   sessionStorage.removeItem('pos_session_active');
   
-  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
+  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || 'https://abiz-pos-system-production-02e4.up.railway.app/api';
   $('login-email').value = await localDb.getSetting('login_email') || '';
   // License key is NOT auto-filled for security — user must enter manually each time
 

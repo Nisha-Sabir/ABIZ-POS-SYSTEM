@@ -289,11 +289,10 @@ textarea.form-control{resize:vertical}
 .receipt-footer{text-align:center;margin-top:14px;padding-top:10px;border-top:1px dashed #ddd;font-size:10px;color:#999}
 
 @media print {
-  body * { display: none !important; }
-  #modal-receipt, #modal-receipt *, #receipt-content, #receipt-content * { display: block !important; }
-  .modal-overlay { background: transparent !important; display: block !important; }
-  .modal { box-shadow: none !important; border: none !important; background: transparent !important; position: absolute; left: 0; top: 0; margin: 0; max-width: 100%; width: 100%; animation: none !important; }
-  .modal-header, .modal-footer { display: none !important; }
+  body > *:not(#modal-receipt) { display: none !important; }
+  #modal-receipt { display: flex !important; background: transparent !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; }
+  .modal { box-shadow: none !important; border: none !important; background: transparent !important; margin: 0; padding: 0; max-width: 100%; width: 100%; animation: none !important; }
+  #modal-receipt .modal-header, #modal-receipt .modal-footer { display: none !important; }
   @page { margin: 0; }
 }
 
@@ -895,7 +894,7 @@ textarea.form-control{resize:vertical}
               <div class="section-title">Quick Actions</div>
               <div style="display:flex;flex-direction:column;gap:8px">
                 <button class="btn btn-outline" onclick="localStorage.clear(); showToast('Cache cleared, reloading...', 'success'); setTimeout(()=>location.reload(), 1000);">Clear System Cache</button>
-                <button class="btn btn-outline" onclick="editReceiptSettings()">Receipt Settings</button>
+                <button class="btn btn-outline" onclick="editReceiptSettings()" style="font-weight:700">🧾 Edit Receipt Template</button>
                 <button class="btn btn-outline" onclick="showPage('settings'); showToast('Open Settings to configure Tax','info')">Tax Configuration</button>
                 <button class="btn btn-outline" onclick="showPage('settings'); showToast('Open Settings to configure Currency','info')">Currency Settings</button>
                 <button class="btn btn-danger" onclick="if(confirm('Are you sure you want to reset everything? This will delete all local data!')) { localStorage.clear(); location.reload(); }">Reset to Defaults</button>
@@ -907,12 +906,35 @@ textarea.form-control{resize:vertical}
 
       <!-- SUPER ADMIN -->
       <div class="page" id="page-superadmin">
-        <div class="stats-grid">
-          <div class="stat-card blue"><div class="stat-label">Total Clients</div><div class="stat-val" style="color:var(--blue2)">24</div></div>
-          <div class="stat-card green"><div class="stat-label">Active Licenses</div><div class="stat-val" style="color:var(--green)">21</div></div>
-          <div class="stat-card amber"><div class="stat-label">Monthly Revenue</div><div class="stat-val" style="color:var(--amber)">Rs.84K</div></div>
-          <div class="stat-card red"><div class="stat-label">Expiring Soon</div><div class="stat-val" style="color:var(--red)">3</div></div>
+        <!-- Live stats banner — populated by renderSuperAdmin() from backend -->
+        <div id="superadmin-stats-banner" class="stats-grid" style="margin-bottom:16px">
+          <div class="stat-card blue"><div class="stat-label">Today's Sales</div><div class="stat-val" style="color:var(--blue2)">—</div></div>
+          <div class="stat-card green"><div class="stat-label">Today's Revenue</div><div class="stat-val" style="color:var(--green)">—</div></div>
+          <div class="stat-card amber"><div class="stat-label">Today's Profit</div><div class="stat-val" style="color:var(--amber)">—</div></div>
+          <div class="stat-card"><div class="stat-label">Total Products</div><div class="stat-val">—</div></div>
         </div>
+
+        <!-- License Management Quick Panel -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+          <div class="card">
+            <div class="section-title" style="margin-bottom:12px">🔑 License Management</div>
+            <p style="font-size:12px;color:var(--text3);margin-bottom:12px">Generate and manage access keys for clients. Each key allows one business to register.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-primary btn-sm" onclick="showPage('licenses')">View All Keys</button>
+              <button class="btn btn-outline btn-sm" onclick="generateLicenseKeyFromBackend()">+ Generate Key</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-title" style="margin-bottom:12px">📋 Registration Flow</div>
+            <div style="font-size:12px;color:var(--text2);line-height:1.7">
+              <div style="margin-bottom:6px">✅ <b>Step 1:</b> Generate a license key here</div>
+              <div style="margin-bottom:6px">✅ <b>Step 2:</b> Share key with client</div>
+              <div style="margin-bottom:6px">✅ <b>Step 3:</b> Client uses key to register</div>
+              <div style="color:var(--green);font-weight:600">🔒 No key = No registration!</div>
+            </div>
+          </div>
+        </div>
+
         <div class="section-title">Client Overview</div>
         <div id="client-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px"></div>
       </div>
@@ -1317,11 +1339,11 @@ function restoreDB() {
       DB.clients = []; DB.staff = []; DB.ledger = []; DB.licenses = [];
     }
     const rl = localStorage.getItem(`abiz_mock_roles${userKey}`);
-    if(rl && document.getElementById('roles-list')) {
+    // Only restore saved roles if they exist — NEVER wipe default HTML roles
+    if(rl && rl.trim().length > 20 && document.getElementById('roles-list')) {
       document.getElementById('roles-list').innerHTML = rl;
-    } else if (document.getElementById('roles-list')) {
-      document.getElementById('roles-list').innerHTML = '';
     }
+    // If no saved roles: keep the default role-cards already in HTML
   } catch(e) {}
 }
 
@@ -1525,7 +1547,7 @@ function renderPage(p){
     case 'reports':renderReports();break;
     case 'superadmin':renderSuperAdmin();break;
     case 'clients':renderClients();break;
-    case 'licenses':renderLicenses();break;
+    case 'licenses':renderLicensesFromBackend();break;
     case 'categories':renderCategories();break;
     case 'adminpanel':renderAdminPanel();break;
   }
@@ -1543,6 +1565,37 @@ function renderAdminPanel(){
   renderStaffTable();
   renderActivityLog();
   updateSystemInfo();
+  // Ensure roles list is never blank — restore defaults if empty
+  const rolesList = document.getElementById('roles-list');
+  if (rolesList && rolesList.children.length === 0) {
+    rolesList.innerHTML = `
+      <div class="role-card">
+        <div class="role-icon" style="background:rgba(239,68,68,.15);color:var(--red)">SA</div>
+        <div class="role-info"><div class="role-name">Super Admin</div><div class="role-desc">Full system access — manage clients, licenses, all data</div></div>
+        <span class="badge badge-red">System Role</span>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background:rgba(37,99,235,.15);color:var(--blue2)">AD</div>
+        <div class="role-info"><div class="role-name">Admin</div><div class="role-desc">Full business access — products, sales, reports, staff</div></div>
+        <span class="badge badge-blue">System Role</span>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background:rgba(16,185,129,.15);color:var(--green)">MG</div>
+        <div class="role-info"><div class="role-name">Manager</div><div class="role-desc">Sales, products, inventory, reports — no staff management</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span class="badge badge-green">Custom Role</span>
+          <button class="btn btn-outline btn-xs" onclick="openEditPermissions('manager')">Edit</button>
+        </div>
+      </div>
+      <div class="role-card">
+        <div class="role-icon" style="background:rgba(245,158,11,.15);color:var(--amber)">CS</div>
+        <div class="role-info"><div class="role-name">Cashier</div><div class="role-desc">POS terminal only — sales and basic product view</div></div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span class="badge badge-amber">Custom Role</span>
+          <button class="btn btn-outline btn-xs" onclick="openEditPermissions('cashier')">Edit</button>
+        </div>
+      </div>`;
+  }
 }
 
 // STAFF
@@ -1748,15 +1801,37 @@ function updateSystemInfo(){
   if(el('sys-ledger')) el('sys-ledger').textContent=DB.ledger.length;
 }
 
-// EXPORT BACKUP
-function exportBackup(){
-  const data={products:DB.products,categories:DB.categories,sales:DB.sales,ledger:DB.ledger,exportDate:new Date().toISOString()};
-  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;a.download='abiz-backup-'+Date.now()+'.json';a.click();
-  URL.revokeObjectURL(url);
-  addActivityLog(DB.user?.name||'Admin','exported full data backup','green');
-  showToast('Backup downloaded!','success');
+// EXPORT BACKUP — fetches real backend data
+async function exportBackup(){
+  try {
+    showToast('Preparing backup from server...', 'info');
+    const [products, sales, categories] = await Promise.all([
+      apiRequest('/products?limit=500').catch(() => DB.products),
+      apiRequest('/sales?limit=500').catch(() => DB.sales),
+      apiRequest('/categories?limit=200').catch(() => DB.categories)
+    ]);
+    const data = {
+      exportDate: new Date().toISOString(),
+      exportedBy: DB.user?.name || 'Admin',
+      products,
+      sales,
+      categories,
+      ledger: DB.ledger,
+      clients: DB.clients,
+      licenses: DB.licenses
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'abiz-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    addActivityLog(DB.user?.name||'Admin', 'exported full data backup', 'green');
+    showToast('Backup downloaded successfully!', 'success');
+  } catch(err) {
+    showToast('Backup failed: ' + err.message, 'error');
+  }
 }
 
 // ─── DASHBOARD ─────────────────────────────
@@ -2097,41 +2172,89 @@ function renderClients(){
     <td><div style="font-weight:600;font-size:12px">${c.biz}</div><div style="font-size:10px;color:var(--text3)">${c.email}</div></td>
     <td style="font-size:12px">${c.contact}<br><span style="font-size:10px;color:var(--text3)">${c.phone}</span></td>
     <td><span class="badge badge-blue">${c.plan.toUpperCase()}</span></td>
-    <td><span class="key-badge" style="font-size:9px">${c.key.slice(0,18)}...</span></td>
+    <td><span class="key-badge" style="font-size:9px;cursor:pointer" onclick="navigator.clipboard?.writeText('${c.key}');showToast('Key copied!','success')" title="Click to copy">${c.key.slice(0,18)}...</span></td>
     <td style="font-size:11px">${c.expiry}</td>
     <td><span class="badge ${c.active?'badge-green':'badge-red'}">${c.active?'Active':'Suspended'}</span></td>
     <td><div class="flex gap-2">
-      <button class="btn btn-outline btn-xs" onclick="alert('Key: ${c.key}')">Key</button>
+      <button class="btn btn-outline btn-xs" onclick="navigator.clipboard?.writeText('${c.key}');showToast('Key copied!','success')">📋 Key</button>
       <button class="btn btn-${c.active?'danger':'success'} btn-xs" onclick="toggleClient('${c.id}')">${c.active?'Suspend':'Activate'}</button>
-      <button class="btn btn-danger btn-xs" onclick="deleteClient('${c.id}')">Delete</button>
     </div></td>
   </tr>`).join('');
 }
 
+// Legacy local function kept for backup restore only
 function renderLicenses(){
-  const tbody=document.getElementById('licenses-tbody');if(!tbody)return;
-  tbody.innerHTML=DB.licenses.map(l=>`<tr>
-    <td class="text-mono" style="font-size:10px">${l.key}</td>
-    <td style="font-size:11px">${l.client}</td>
-    <td><span class="badge badge-blue">${l.plan.toUpperCase()}</span></td>
-    <td style="font-size:11px">${l.issued}</td>
-    <td style="font-size:11px">${l.expiry}</td>
-    <td><span class="badge ${l.status==='active'?'badge-green':'badge-red'}">${l.status}</span></td>
-    <td><div class="flex gap-2">
-      <button class="btn btn-outline btn-xs" onclick="showToast('Key copied!','success')">Copy</button>
-      <button class="btn btn-${l.status==='active'?'danger':'success'} btn-xs" onclick="toggleLicense('${l.id}')">${l.status==='active'?'Revoke':'Activate'}</button>
-    </div></td>
-  </tr>`).join('');
+  renderLicensesFromBackend();
 }
 
-function toggleLicense(id){const l=DB.licenses.find(x=>x.id===id);if(l){l.status=l.status==='active'?'revoked':'active';renderLicenses();showToast('License updated','info');}}
+async function renderLicensesFromBackend(){
+  const tbody=document.getElementById('licenses-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">Loading...</td></tr>';
+  try {
+    const licenses = await apiRequest('/license-keys?limit=100');
+    if (!licenses.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text3)">No license keys found. Click "Generate New Key" to create one.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = licenses.map(l => `<tr>
+      <td class="text-mono" style="font-size:10px;user-select:all;cursor:pointer" onclick="navigator.clipboard?.writeText('${l.license_key}');showToast('Key copied!','success')" title="Click to copy">${l.license_key}</td>
+      <td style="font-size:11px">${l.assigned_to || '<span style="color:var(--text3)">Unassigned</span>'}</td>
+      <td><span class="badge badge-blue">CLIENT</span></td>
+      <td style="font-size:11px">${new Date(l.created_at).toLocaleDateString()}</td>
+      <td style="font-size:11px">${l.expiry_date ? new Date(l.expiry_date).toLocaleDateString() : '-'}</td>
+      <td><span class="badge ${l.status === 'active' ? 'badge-green' : l.status === 'revoked' ? 'badge-red' : 'badge-amber'}">${l.status.toUpperCase()}</span></td>
+      <td><div class="flex gap-2">
+        <button class="btn btn-outline btn-xs" onclick="navigator.clipboard?.writeText('${l.license_key}');showToast('Key copied!','success')">📋 Copy</button>
+        <button class="btn btn-success btn-xs" onclick="openAssignLicense(${l.id}, '${l.license_key}')">Assign</button>
+        ${l.status === 'active' ? `<button class="btn btn-danger btn-xs" onclick="revokeLicenseKey(${l.id})">Revoke</button>` : l.status === 'revoked' ? `<button class="btn btn-success btn-xs" onclick="activateLicenseKey(${l.id})">Activate</button>` : '<span style="color:var(--text3);font-size:11px">Pending</span>'}
+      </div></td>
+    </tr>`).join('');
+  } catch(err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--red)">${err.message}</td></tr>`;
+    showToast(err.message, 'error');
+  }
+}
 
-function generateLicense(){
-  const chars='ABCDEFabcdef0123456789';
-  const seg=()=>Array.from({length:4},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
-  const key=seg()+'-'+seg()+'-'+seg()+'-'+seg();
-  DB.licenses.push({id:'lic'+Date.now(),key,client:'Unassigned',plan:'basic',issued:new Date().toISOString().slice(0,10),expiry:'',status:'pending'});
-  renderLicenses();showToast('Key generated: '+key,'success');
+async function revokeLicenseKey(id){
+  if (!confirm('Revoke this license key? The user will lose access.')) return;
+  try {
+    await apiRequest('/license-keys/' + id + '/revoke', { method: 'POST', body: JSON.stringify({}) });
+    await renderLicensesFromBackend();
+    showToast('License revoked', 'info');
+  } catch(err) {
+    showToast(err.message, 'error');
+  }
+}
+
+async function activateLicenseKey(id){
+  try {
+    await apiRequest('/license-keys/' + id + '/assign', { method: 'POST', body: JSON.stringify({}) });
+    await renderLicensesFromBackend();
+    showToast('License activated', 'success');
+  } catch(err) {
+    // Fallback: patch status directly if no activate endpoint
+    showToast('Use Generate New Key to create a fresh active key', 'info');
+  }
+}
+
+function openAssignLicense(id, key) {
+  const name = prompt(`Assign license key:\n${key}\n\nEnter client name / business name:`);
+  if (name === null) return; // cancelled
+  assignLicenseKey(id, name.trim());
+}
+
+async function assignLicenseKey(id, assignedTo) {
+  try {
+    await apiRequest('/license-keys/' + id + '/assign', {
+      method: 'POST',
+      body: JSON.stringify({ assigned_to: assignedTo })
+    });
+    await renderLicensesFromBackend();
+    showToast('License assigned to: ' + assignedTo, 'success');
+  } catch(err) {
+    showToast(err.message, 'error');
+  }
 }
 
 function renderCategories(){
@@ -3273,6 +3396,23 @@ async function confirmGenerateLicense() {
     await renderLicenses();
     closeModal('modal-generate-license');
     showToast('Key generated: ' + l.license_key, 'success');
+    // Copy to clipboard automatically
+    navigator.clipboard?.writeText(l.license_key);
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+// Shortcut: Generate key directly from Super Admin page
+async function generateLicenseKeyFromBackend() {
+  const clientName = prompt('Client name (optional):\nLeave blank to generate unassigned key.');
+  if (clientName === null) return; // cancelled
+  try {
+    const payload = { assigned_to: clientName.trim() || null };
+    const l = await apiRequest('/license-keys', { method: 'POST', body: JSON.stringify(payload) });
+    navigator.clipboard?.writeText(l.license_key);
+    showToast('✅ Key generated & copied: ' + l.license_key, 'success');
+    await renderSuperAdmin(); // Refresh stats
   } catch (error) {
     showToast(error.message, 'error');
   }
@@ -3738,33 +3878,43 @@ function getReceiptSettings(){
 function editReceiptSettings(){
   const settings = getReceiptSettings();
   const html = `
-    <div style="padding:10px">
-      <div class="form-group"><label class="form-label">Receipt Title</label><input class="form-control" id="rs-title" value="${settings.title}"/></div>
-      <div class="form-group"><label class="form-label">Font Size (px)</label><input class="form-control" type="number" id="rs-font" value="${settings.fontSize}"/></div>
-      <div class="form-group"><label class="form-label">Footer Text</label><input class="form-control" id="rs-footer" value="${settings.footer}"/></div>
-      <button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="saveReceiptSettings()">Save Settings</button>
+    <div style="padding:4px">
+      <div style="font-size:12px;font-weight:700;color:var(--blue2);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">🧾 Receipt Template Editor</div>
+      <div class="form-group"><label class="form-label">Business / Shop Name</label><input class="form-control" id="rs-title" value="${settings.title}" placeholder="Your Business Name"/></div>
+      <div class="form-group"><label class="form-label">Font Size (px)</label><input class="form-control" type="number" id="rs-font" value="${settings.fontSize}" min="10" max="18"/></div>
+      <div class="form-group"><label class="form-label">Footer Message</label><input class="form-control" id="rs-footer" value="${settings.footer}" placeholder="Thank you for your purchase!"/></div>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <button class="btn btn-outline" style="flex:1" onclick="closeModal('modal-receipt')">Cancel</button>
+        <button class="btn btn-primary" style="flex:2" onclick="saveReceiptSettings()">💾 Save Template</button>
+      </div>
     </div>
   `;
   document.getElementById('receipt-content').innerHTML = html;
+  openModal('modal-receipt');
 }
 
 function saveReceiptSettings(){
-  const title = document.getElementById('rs-title').value;
-  const fontSize = document.getElementById('rs-font').value;
-  const footer = document.getElementById('rs-footer').value;
+  const title = document.getElementById('rs-title')?.value || 'ABIZ Global Services';
+  const fontSize = document.getElementById('rs-font')?.value || '12';
+  const footer = document.getElementById('rs-footer')?.value || 'Thank you for your purchase!';
   localStorage.setItem('abiz_receipt_settings', JSON.stringify({ title, fontSize, footer }));
-  showToast('Receipt settings saved', 'success');
+  showToast('✅ Receipt template saved!', 'success');
   closeModal('modal-receipt');
 }
 
 function showReceipt(sale){
   const settings = getReceiptSettings();
+  const fs = Number(settings.fontSize) || 12;
   document.getElementById('receipt-content').innerHTML=`
-    <div class="receipt-box" style="font-size:${Number(settings.fontSize) || 12}px">
+    <div class="receipt-box" style="font-size:${fs}px">
       <div class="receipt-header">
         <div class="receipt-logo">${settings.title}</div>
         <div style="font-size:10px;margin-top:4px;color:#666">POS System | Tax Invoice</div>
-        <div style="font-size:10px;margin-top:6px;color:#666"><div><b>Invoice:</b> ${sale.invoice}</div><div><b>Date:</b> ${sale.date}</div><div><b>Payment:</b> ${(sale.payment || 'cash').toUpperCase()}</div></div>
+        <div style="font-size:10px;margin-top:6px;color:#666;border-top:1px dashed #ccc;padding-top:6px">
+          <div><b>Invoice:</b> ${sale.invoice || 'N/A'}</div>
+          <div><b>Date:</b> ${sale.date || new Date().toLocaleString()}</div>
+          <div><b>Payment:</b> ${(sale.payment || 'cash').toUpperCase()}</div>
+        </div>
       </div>
       <div style="margin:10px 0">
         <div class="ri-row header"><span>Item</span><span>Qty</span><span>Price</span><span>Total</span></div>
@@ -3774,15 +3924,55 @@ function showReceipt(sale){
         <div class="rt-row"><span>Subtotal</span><span>Rs. ${Number(sale.subtotal || sale.total || 0).toLocaleString()}</span></div>
         ${sale.discount?`<div class="rt-row"><span>Discount</span><span style="color:#EF4444">- Rs. ${Number(sale.discount).toLocaleString()}</span></div>`:''}
         <div class="rt-row grand"><span>TOTAL</span><span>Rs. ${Number(sale.total || 0).toLocaleString()}</span></div>
+        ${sale.paid ? `<div class="rt-row"><span>Paid</span><span>Rs. ${Number(sale.paid).toLocaleString()}</span></div>` : ''}
+        ${(sale.change > 0) ? `<div class="rt-row" style="color:#10b981"><span>Change</span><span>Rs. ${Number(sale.change).toLocaleString()}</span></div>` : ''}
       </div>
       <div class="receipt-footer">${settings.footer}<br><b>abizglobalservices.com</b></div>
     </div>`;
   openModal('modal-receipt');
 }
 
-function renderSuperAdmin() {
+async function renderSuperAdmin() {
   const grid = document.getElementById('client-cards-grid');
   if (!grid) return;
+
+  // Fetch real backend stats for Super Admin view
+  let todaySales = 0, todayRevenue = 0, todayProfit = 0, totalProducts = 0;
+  try {
+    const [sales, products] = await Promise.all([
+      apiRequest('/sales?limit=200').catch(() => []),
+      apiRequest('/products?limit=500').catch(() => [])
+    ]);
+    totalProducts = products.length;
+    const today = new Date().toISOString().slice(0, 10);
+    const todaySalesArr = sales.filter(s => (s.created_at || '').startsWith(today));
+    todaySales = todaySalesArr.length;
+    todayRevenue = todaySalesArr.reduce((a, s) => a + Number(s.total_amount || 0), 0);
+    todayProfit = todaySalesArr.reduce((a, s) => a + Number(s.total_profit || 0), 0);
+  } catch(e) {}
+
+  // Show stats banner
+  const statsBanner = document.getElementById('superadmin-stats-banner');
+  if (statsBanner) {
+    statsBanner.innerHTML = `
+      <div class="stat-card" style="background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(0,212,255,.08))">
+        <div class="stat-label">Today's Sales</div>
+        <div class="stat-val" style="color:var(--blue2)">${todaySales}</div>
+      </div>
+      <div class="stat-card" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(0,212,255,.08))">
+        <div class="stat-label">Today's Revenue</div>
+        <div class="stat-val" style="color:var(--green)">Rs.${todayRevenue.toLocaleString()}</div>
+      </div>
+      <div class="stat-card" style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(0,212,255,.08))">
+        <div class="stat-label">Today's Profit</div>
+        <div class="stat-val" style="color:var(--amber)">Rs.${todayProfit.toLocaleString()}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Products</div>
+        <div class="stat-val">${totalProducts}</div>
+      </div>`;
+  }
+
   grid.innerHTML = DB.clients.map(c => `
     <div class="card" style="position:relative">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
@@ -3792,15 +3982,15 @@ function renderSuperAdmin() {
         </div>
         <span class="badge ${c.active ? 'badge-green' : 'badge-red'}">${c.active ? 'Active' : 'Suspended'}</span>
       </div>
-      <div style="font-size:12px;margin-bottom:8px"><b>Key:</b> <span class="text-mono">${c.key}</span></div>
+      <div style="font-size:12px;margin-bottom:8px"><b>Key:</b> <span class="text-mono" style="cursor:pointer" onclick="navigator.clipboard?.writeText('${c.key}');showToast('Key copied!','success')" title="Click to copy">${c.key}</span></div>
       <div style="font-size:12px;margin-bottom:8px"><b>Plan:</b> ${c.plan.toUpperCase()}</div>
       <div style="font-size:12px;margin-bottom:12px"><b>Expires:</b> ${new Date(c.expiry).toLocaleDateString()}</div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-outline btn-xs" onclick="alert('Key: ${c.key}')">View Key</button>
-        <button class="btn btn-danger btn-xs" onclick="deleteClient('${c.id}')">Delete</button>
+        <button class="btn btn-outline btn-xs" onclick="navigator.clipboard?.writeText('${c.key}');showToast('Key copied!','success')">📋 Copy Key</button>
+        <button class="btn btn-${c.active?'danger':'success'} btn-xs" onclick="toggleClient('${c.id}')">${c.active?'Suspend':'Activate'}</button>
       </div>
     </div>
-  `).join('');
+  `).join('') || '<div class="empty" style="padding:20px">No clients added yet. Use "Add Client" to create one.</div>';
 }
 
 function deleteClient(id) {
@@ -3814,8 +4004,14 @@ function deleteClient(id) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
+
+  // Reset Password flow — detect token in URL first
   if (urlParams.has('reset_token')) {
-    openModal('modal-reset-password');
+    // Show auth page (login page is the container), then open reset modal
+    document.getElementById('auth-page').style.display = 'flex';
+    document.getElementById('app-shell').style.display = 'none';
+    setTimeout(() => openModal('modal-reset-password'), 100);
+    return; // Stop all other init — user only needs to reset password
   }
 
   // Clear token on start to force login per user requirement

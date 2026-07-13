@@ -289,11 +289,10 @@ textarea.form-control{resize:vertical}
 .receipt-footer{text-align:center;margin-top:14px;padding-top:10px;border-top:1px dashed #ddd;font-size:10px;color:#999}
 
 @media print {
-  body * { display: none !important; }
-  #modal-receipt, #modal-receipt *, #receipt-content, #receipt-content * { display: block !important; }
-  .modal-overlay { background: transparent !important; display: block !important; }
-  .modal { box-shadow: none !important; border: none !important; background: transparent !important; position: absolute; left: 0; top: 0; margin: 0; max-width: 100%; width: 100%; animation: none !important; }
-  .modal-header, .modal-footer { display: none !important; }
+  body > *:not(#modal-receipt) { display: none !important; }
+  #modal-receipt { display: flex !important; background: transparent !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; }
+  .modal { box-shadow: none !important; border: none !important; background: transparent !important; margin: 0; padding: 0; max-width: 100%; width: 100%; animation: none !important; }
+  #modal-receipt .modal-header, #modal-receipt .modal-footer { display: none !important; }
   @page { margin: 0; }
 }
 

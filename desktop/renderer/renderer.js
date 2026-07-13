@@ -428,11 +428,10 @@ function printInvoice(sale, cartItems) {
       .btn-close { background: #f1f5f9; color: #333; }
       
       @media print {
-        body * { display: none !important; }
-        #offline-receipt-modal, #offline-receipt-modal * { display: block !important; }
-        #offline-receipt-modal { position: absolute; left: 0; top: 0; margin: 0; padding: 0; background: white !important; align-items: flex-start; justify-content: flex-start; }
+        body > *:not(#offline-receipt-modal) { display: none !important; }
+        #offline-receipt-modal { display: flex !important; background: white !important; position: absolute; left: 0; top: 0; width: 100%; height: auto; align-items: flex-start; justify-content: flex-start; margin: 0; padding: 0; }
         .offline-receipt-box { box-shadow: none !important; max-width: 100%; }
-        .offline-receipt-actions { display: none !important; }
+        #offline-receipt-modal .offline-receipt-actions { display: none !important; }
         @page { margin: 0; }
       }
     `;
