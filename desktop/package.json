@@ -27,7 +27,7 @@
       "frontend/**"
     ],
     "win": {
-      "target": "nsis"
+      "target": "portable"
     }
   }
 }

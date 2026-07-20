@@ -169,9 +169,15 @@ async function getBackendConfig() {
 async function api(path, options = {}) {
   const { baseUrl, token } = await getBackendConfig();
   if (!baseUrl) throw new Error('Backend URL missing in Settings.');
+  
+  let finalBase = baseUrl.replace(/\/$/, '');
+  if (!finalBase.endsWith('/api/v1')) {
+    finalBase += '/api/v1';
+  }
+
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(baseUrl.replace(/\/$/, '') + path, { ...options, headers });
+  const response = await fetch(finalBase + path, { ...options, headers });
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
     let errMsg = data.detail || data.message || 'Server request failed.';

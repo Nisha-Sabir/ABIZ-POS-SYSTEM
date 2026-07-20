@@ -1,14 +1,12 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 
-app.setPath('userData', path.join(__dirname, 'electron-local-data'));
+
 app.commandLine.appendSwitch('disable-gpu-shader-disk-cache');
 app.commandLine.appendSwitch('disk-cache-size', '1');
 
-const gotTheLock = app.requestSingleInstanceLock();
-if (!gotTheLock) {
-  app.quit();
-}
+// Allow multiple instances
+const gotTheLock = true;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -22,7 +20,7 @@ function createWindow() {
     }
   });
 
-  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  win.loadFile(path.join(__dirname, 'renderer', 'mode_select.html'));
 }
 
 app.disableHardwareAcceleration();
