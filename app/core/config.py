@@ -20,7 +20,7 @@ class Settings(BaseSettings):
         default="change-this-secret-key",
         description="Secret key used to sign JWT access tokens.",
     )
-    access_token_expire_minutes: int = 60
+    access_token_expire_minutes: int = 43200
     algorithm: str = "HS256"
     backend_cors_origins: str = Field(
         default="http://127.0.0.1:8000,http://localhost:8000",

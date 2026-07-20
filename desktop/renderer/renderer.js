@@ -6,7 +6,7 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 const localDb = (() => {
-  const request = indexedDB.open('abiz-pos-local-db', 1);
+  const request = indexedDB.open('abiz-pos-local-db', 2);
   const ready = new Promise((resolve, reject) => {
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -521,81 +521,84 @@ async function loadSettings() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Clear session to force login per user request
-  sessionStorage.removeItem('pos_session_active');
-  
-  $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || '';
-  $('login-email').value = await localDb.getSetting('login_email') || '';
-  // License key is NOT auto-filled for security — user must enter manually each time
+  try {
+    // Clear session to force login per user request
+    sessionStorage.removeItem('pos_session_active');
+    
+    $('backend-url').value = await localDb.getSetting('backend_url') || localStorage.getItem('abiz_api_base') || 'https://abiz-pos-api.onrender.com';
+    $('login-email').value = await localDb.getSetting('login_email') || '';
 
-  // Fix Electron input focus — only redirect focus if user clicks panel background (not on an input)
-  const loginPanel = $('login-panel');
-  if (loginPanel) {
-    loginPanel.addEventListener('click', (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
-      const inputs = loginPanel.querySelectorAll('input:not([style*="display:none"])');
-      for (const inp of inputs) {
-        if (!inp.value) { inp.focus(); break; }
+    const loginPanel = $('login-panel');
+    if (loginPanel) {
+      loginPanel.addEventListener('click', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+        const inputs = loginPanel.querySelectorAll('input:not([style*="display:none"])');
+        for (const inp of inputs) {
+          if (!inp.value) { inp.focus(); break; }
+        }
+      });
+    }
+    $('scanner-input').addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter') return;
+      const code = event.target.value.trim();
+      event.target.value = '';
+      if (code) await scanProduct(code);
+    });
+    
+    let barcodeBuffer = '';
+    let barcodeTimeout = null;
+    document.addEventListener('keydown', async (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'Enter' && barcodeBuffer.length > 2) {
+        await scanProduct(barcodeBuffer);
+        barcodeBuffer = '';
+        return;
+      }
+      if (e.key.length === 1) {
+        barcodeBuffer += e.key;
+        clearTimeout(barcodeTimeout);
+        barcodeTimeout = setTimeout(() => barcodeBuffer = '', 100);
       }
     });
+    $('sync-products').addEventListener('click', () => syncProducts().catch((error) => { setStatus(error.message, false); alert(error.message); }));
+    $('sync-sales').addEventListener('click', () => syncSales().catch((error) => { setStatus(error.message, false); alert(error.message); }));
+    $('checkout').addEventListener('click', () => checkout().catch((error) => { setStatus(error.message, false); alert(error.message); }));
+    $('clear-cart').addEventListener('click', () => { state.cart = []; renderCart(); });
+    $('discount-input')?.addEventListener('input', renderCart);
+    $('amount-paid')?.addEventListener('input', renderCart);
+    $('settings-btn')?.addEventListener('click', async () => {
+      const url = prompt('Backend URL', await localDb.getSetting('backend_url'));
+      if (url) {
+        await localDb.setSetting('backend_url', url.trim());
+        $('backend-url').value = url.trim();
+        await setStatus('Backend URL saved.');
+      }
+    });
+    $('login-btn')?.addEventListener('click', async () => {
+      $('login-email').value = await localDb.getSetting('login_email');
+      $('login-password').focus();
+    });
+    $('save-settings')?.addEventListener('click', async () => {
+      await localDb.setSetting('backend_url', $('backend-url').value.trim());
+      await setStatus('Settings saved.');
+    });
+    $('do-login').addEventListener('click', () => login().catch((error) => { setStatus(error.message, false); alert(error.message); }));
+    $('login-password')?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') login().catch((error) => { setStatus(error.message, false); alert(error.message); });
+    });
+    $('logout-btn')?.addEventListener('click', () => logout().catch((error) => { setStatus(error.message, false); alert(error.message); }));
+    window.addEventListener('online', tryAutoSync);
+    window.addEventListener('offline', () => setStatus('Offline mode active.'));
+    setInterval(tryAutoSync, 60000);
+    await refreshProducts();
+    renderCart();
+    const loggedIn = await updateAuthState();
+    if (!loggedIn && navigator.onLine && $('backend-url').value && $('login-email').value) {
+      setStatus('Login required to refresh access.', false);
+    }
+    await setStatus('Desktop app ready.');
+  } catch (err) {
+    alert("Initialization Error: " + err.message);
+    document.getElementById('status').textContent = "Init Error: " + err.message;
   }
-  $('scanner-input').addEventListener('keydown', async (event) => {
-    if (event.key !== 'Enter') return;
-    const code = event.target.value.trim();
-    event.target.value = '';
-    if (code) await scanProduct(code);
-  });
-  
-  let barcodeBuffer = '';
-  let barcodeTimeout = null;
-  document.addEventListener('keydown', async (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-    if (e.key === 'Enter' && barcodeBuffer.length > 2) {
-      await scanProduct(barcodeBuffer);
-      barcodeBuffer = '';
-      return;
-    }
-    if (e.key.length === 1) {
-      barcodeBuffer += e.key;
-      clearTimeout(barcodeTimeout);
-      barcodeTimeout = setTimeout(() => barcodeBuffer = '', 100);
-    }
-  });
-  $('sync-products').addEventListener('click', () => syncProducts().catch((error) => setStatus(error.message, false)));
-  $('sync-sales').addEventListener('click', () => syncSales().catch((error) => setStatus(error.message, false)));
-  $('checkout').addEventListener('click', () => checkout().catch((error) => setStatus(error.message, false)));
-  $('clear-cart').addEventListener('click', () => { state.cart = []; renderCart(); });
-  $('discount-input')?.addEventListener('input', renderCart);
-  $('amount-paid')?.addEventListener('input', renderCart);
-  $('settings-btn')?.addEventListener('click', async () => {
-    const url = prompt('Backend URL', await localDb.getSetting('backend_url'));
-    if (url) {
-      await localDb.setSetting('backend_url', url.trim());
-      $('backend-url').value = url.trim();
-      await setStatus('Backend URL saved.');
-    }
-  });
-  $('login-btn')?.addEventListener('click', async () => {
-    $('login-email').value = await localDb.getSetting('login_email');
-    $('login-password').focus();
-  });
-  $('save-settings')?.addEventListener('click', async () => {
-    await localDb.setSetting('backend_url', $('backend-url').value.trim());
-    await setStatus('Settings saved.');
-  });
-  $('do-login').addEventListener('click', () => login().catch((error) => setStatus(error.message, false)));
-  $('login-password')?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter') login().catch((error) => setStatus(error.message, false));
-  });
-  $('logout-btn')?.addEventListener('click', () => logout().catch((error) => setStatus(error.message, false)));
-  window.addEventListener('online', tryAutoSync);
-  window.addEventListener('offline', () => setStatus('Offline mode active.'));
-  setInterval(tryAutoSync, 60000);
-  await refreshProducts();
-  renderCart();
-  const loggedIn = await updateAuthState();
-  if (!loggedIn && navigator.onLine && $('backend-url').value && $('login-email').value) {
-    setStatus('Login required to refresh access.', false);
-  }
-  await setStatus('Desktop app ready.');
 });
