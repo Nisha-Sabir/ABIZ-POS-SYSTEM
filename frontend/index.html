@@ -343,6 +343,7 @@ textarea.form-control{resize:vertical}
   table{min-width:400px}
   .btn{font-size:11px;padding:7px 12px}
   .btn-sm{padding:5px 10px;font-size:10px}
+  #web-api-base, #web-save-api { display: none !important; }
 }
 @media(max-width:480px){
   .stats-grid{grid-template-columns:1fr 1fr}
@@ -497,7 +498,7 @@ textarea.form-control{resize:vertical}
       <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
         <input id="web-api-base" placeholder="https://abiz-pos.up.railway.app/api" class="form-control" style="width:280px;font-size:12px;padding:6px 10px;height:auto;background:var(--card);border:1px solid var(--border);color:var(--text)">
         <button id="web-save-api" class="btn btn-primary btn-sm" onclick="saveWebBackend()">Save Backend</button>
-        <button class="btn btn-outline btn-sm" style="background:#475569;color:#fff;border:none" onclick="window.location.href='/offline-pos/offline.html'">Offline POS</button>
+
       </div>
       <div class="icon-btn" onclick="toggleTheme()" title="Theme">T</div>
       <div class="icon-btn" onclick="showPage('scanner')" title="Scanner">QR</div>
